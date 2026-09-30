@@ -1,4 +1,4 @@
-name: Validar mural
+name: Publicar mural
 
 on:
   workflow_dispatch:
@@ -9,6 +9,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -29,3 +35,37 @@ jobs:
           npm run security:check
         env:
           API_BASE_URL: https://api.example.invalid
+
+  build-pages:
+    if: github.event_name != 'pull_request' && vars.API_BASE_URL != ''
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Gerar frontend para produção
+        run: |
+          npm ci
+          npm run build
+          npm run security:check
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy-pages:
+    if: github.event_name != 'pull_request' && vars.API_BASE_URL != ''
+    needs: build-pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

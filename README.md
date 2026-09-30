@@ -132,7 +132,7 @@ O bootstrap também é bloqueado pelo banco assim que existe qualquer moderador;
 
 1. No repositório GitHub, crie uma **Repository variable** chamada `API_BASE_URL` com a URL HTTPS do Worker, sem `/api` e sem barra final.
 2. Em **Settings → Pages → Build and deployment**, selecione **GitHub Actions**.
-3. O workflow `.github/workflows/pages.yml` valida dependências, testes, build e segredos a cada push. A publicação automática do Pages deve ser habilitada somente depois que o Worker estiver implantado e `API_BASE_URL` estiver configurada.
+3. O workflow `.github/workflows/pages.yml` valida dependências, testes, build e segredos a cada push. Quando `API_BASE_URL` existe, ele também gera o artefato de produção e publica no GitHub Pages.
 4. Confirme que `ALLOWED_ORIGINS` no Worker contém a origem final mostrada pelo GitHub Pages. Se mudar, atualize `wrangler.toml` e republique somente o Worker.
 
 A URL da API não é segredo e aparece no `config.js` publicado. Credenciais e segredos não devem ser configurados como variável do frontend.
