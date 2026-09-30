@@ -20,7 +20,7 @@ import {
 } from "./domain.js";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
-const DUMMY_PASSWORD_HASH = "pbkdf2_sha256$210000$AAAAAAAAAAAAAAAAAAAAAA$fWRw1tMMNXIB-BL9JMJZQUi8B_duChU9zkiednkNWVw";
+const DUMMY_PASSWORD_HASH = "pbkdf2_sha256$100000$AAAAAAAAAAAAAAAAAAAAAA$4xu9zyUhIT1-X1c3WzYqkFpmoegrbv5v-CWWppWKatw";
 
 function securityHeaders(origin, env) {
   const headers = {

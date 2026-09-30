@@ -34,7 +34,7 @@ O Pages nunca recebe senha, hash de senha, segredo do Worker ou acesso direto ao
 - histórico administrativo de perfis com data, status, quantidade de cartinhas e ações para copiar ou abrir cada link;
 - alteração auditada entre perfil público e privado diretamente no histórico administrativo, com controles responsivos para celular;
 - várias contas de moderação, criação, desativação e encerramento das sessões desativadas;
-- senhas PBKDF2-SHA256 com salt aleatório e 210 mil iterações;
+- senhas PBKDF2-SHA256 com salt aleatório e 100 mil iterações, o máximo aceito pelo runtime Workers;
 - sessões de até 8 horas, CORS por lista explícita, limites por origem e trilha de auditoria;
 - proteção de login contra enumeração por resposta genérica, verificação de senha equivalente e limite de 10 tentativas por 15 minutos;
 - limites de 3 perfis por hora e 5 cartinhas por mural a cada 10 minutos por origem pseudonimizada;

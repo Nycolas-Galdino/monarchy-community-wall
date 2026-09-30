@@ -35,10 +35,12 @@ describe("validation and security helpers", () => {
   it("hashes passwords with salt and verifies without storing plaintext", async () => {
     const first = await hashPassword("senha-de-teste-segura");
     const second = await hashPassword("senha-de-teste-segura");
+    expect(first.split("$")[1]).toBe("100000");
     expect(first).not.toBe(second);
     expect(first).not.toContain("senha-de-teste-segura");
     await expect(verifyPassword("senha-de-teste-segura", first)).resolves.toBe(true);
     await expect(verifyPassword("senha-errada", first)).resolves.toBe(false);
+    await expect(hashPassword("senha-de-teste-segura", 100001)).rejects.toThrow("unsupported_password_iterations");
   });
 
   it("allows only explicitly configured browser origins", () => {

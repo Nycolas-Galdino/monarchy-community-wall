@@ -185,7 +185,12 @@ export function randomToken(byteLength = 32) {
   return bytesToBase64Url(bytes);
 }
 
-export async function hashPassword(password, iterations = 210000, saltBytes) {
+export const PASSWORD_HASH_ITERATIONS = 100000;
+
+export async function hashPassword(password, iterations = PASSWORD_HASH_ITERATIONS, saltBytes) {
+  if (!Number.isSafeInteger(iterations) || iterations !== PASSWORD_HASH_ITERATIONS) {
+    throw new Error("unsupported_password_iterations");
+  }
   const salt = saltBytes ?? crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey(
     "raw",
@@ -205,7 +210,9 @@ export async function hashPassword(password, iterations = 210000, saltBytes) {
 export async function verifyPassword(password, encoded) {
   const [algorithm, iterationText, saltText, expectedText] = String(encoded).split("$");
   if (algorithm !== "pbkdf2_sha256" || !iterationText || !saltText || !expectedText) return false;
-  const candidate = await hashPassword(password, Number(iterationText), base64UrlToBytes(saltText));
+  const iterations = Number(iterationText);
+  if (iterations !== PASSWORD_HASH_ITERATIONS) return false;
+  const candidate = await hashPassword(password, iterations, base64UrlToBytes(saltText));
   const candidateBytes = new TextEncoder().encode(candidate);
   const expectedBytes = new TextEncoder().encode(encoded);
   if (candidateBytes.length !== expectedBytes.length) return false;
