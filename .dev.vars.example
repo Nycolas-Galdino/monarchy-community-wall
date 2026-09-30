@@ -1,0 +1,3 @@
+# Copie para .dev.vars. Nunca envie este arquivo ao Git.
+BOOTSTRAP_TOKEN="gere-um-segredo-longo-com-32-ou-mais-caracteres"
+IP_HASH_SECRET="gere-outro-segredo-independente"

@@ -1,0 +1,21 @@
+{
+  "name": "monarchy-community-wall",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --persist-to .wrangler/state",
+    "db:local": "wrangler d1 migrations apply monarchy-letters --local --persist-to .wrangler/state",
+    "db:remote": "wrangler d1 migrations apply monarchy-letters --remote",
+    "test": "vitest run",
+    "security:check": "node scripts/security-check.mjs",
+    "check": "node --check worker/index.js && node --check worker/domain.js && node --check public/bootstrap.js && node --check public/app.js && node --check public/api.js && node --check public/model.js && node --check public/story.js && node --check scripts/security-check.mjs && npm run security:check",
+    "build": "node scripts/build.mjs",
+    "deploy:api": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.0.0",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.42.0"
+  }
+}

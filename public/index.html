@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Um mural público de cartinhas anônimas para a comunidade.">
+  <meta name="theme-color" content="#1a0d45">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' http://localhost:8787; img-src 'self' data: blob: http://localhost:8787; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%235b347b'/%3E%3Cpath d='M32 13l4.5 14.5L51 32l-14.5 4.5L32 51l-4.5-14.5L13 32l14.5-4.5z' fill='%23efb84d'/%3E%3C/svg%3E">
+  <title>Correio da Comunidade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600;6..72,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260930-admin-visibility">
+</head>
+<body>
+  <a class="skip-link" href="#mural">Pular para as cartinhas</a>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Correio da Comunidade, início">
+      <span class="brand-mark" aria-hidden="true">✦</span>
+      <span>Correio da<br><strong>Comunidade</strong></span>
+    </a>
+    <nav aria-label="Navegação principal">
+      <a href="#escrever">Escrever</a>
+      <a href="#mural">Mural</a>
+      <a href="#criar-perfil" id="create-profile-nav">Criar meu mural</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="profile-identity" id="profile-identity" hidden>
+          <img id="profile-avatar" alt="" hidden>
+          <span class="profile-avatar-fallback" id="profile-avatar-fallback" aria-hidden="true">M</span>
+          <div><p class="profile-label">mural de</p><strong id="profile-name"></strong></div>
+        </div>
+        <p class="eyebrow">um cantinho para palavras bonitas</p>
+        <h1 id="hero-title">Tem algo para dizer?<br><em>Deixe virar cartinha.</em></h1>
+        <p class="hero-intro">Escolha alguém da comunidade, escreva com carinho e publique sem revelar seu nome. Gentileza também faz barulho.</p>
+        <p class="profile-description" id="profile-description" hidden></p>
+        <div class="profile-links" id="profile-links" hidden>
+          <a id="profile-ducks-link" class="secondary-button" target="_blank" rel="noopener noreferrer" hidden>Ver perfil no Ducks ↗</a>
+          <button id="copy-profile-link" class="secondary-button" type="button">Copiar link deste mural</button>
+        </div>
+        <a class="primary-button" href="#escrever">Escrever uma cartinha <span aria-hidden="true">↘</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="envelope">
+          <span class="envelope-flap"></span>
+          <span class="paper-note">para você,<br>com carinho <b>♥</b></span>
+          <span class="stamp">✦</span>
+        </div>
+        <span class="spark spark-one">✦</span><span class="spark spark-two">✧</span><span class="spark spark-three">•</span>
+      </div>
+    </section>
+
+    <section class="profile-creator-section" id="criar-perfil" aria-labelledby="profile-creator-title">
+      <div class="section-heading">
+        <span class="step">✦</span>
+        <div><p class="eyebrow">seu link, seu cantinho</p><h2 id="profile-creator-title">Crie seu mural pessoal</h2><p class="section-intro">Só o nome é obrigatório. Ao terminar, você recebe um link único para colocar no seu perfil.</p></div>
+      </div>
+      <form class="profile-form" id="profile-form" novalidate>
+        <div class="profile-form-fields">
+          <div class="field"><label for="profile-display-name">Nome do perfil <span aria-hidden="true">*</span></label><input id="profile-display-name" name="displayName" required minlength="2" maxlength="60" autocomplete="nickname" placeholder="Como devemos chamar você?"></div>
+          <div class="field"><label for="profile-description-input">Descrição <span class="optional">opcional</span></label><textarea id="profile-description-input" name="description" rows="3" maxlength="240" placeholder="Conte um pouquinho sobre você ou sobre seu mural."></textarea><span class="counter" id="profile-description-counter">0 / 240</span></div>
+          <div class="field"><label for="profile-ducks-url">Link do perfil Ducks <span class="optional">opcional</span></label><input id="profile-ducks-url" name="ducksUrl" type="url" inputmode="url" placeholder="https://app.duckapps.com.br/seu-perfil"></div>
+          <div class="field"><label for="profile-avatar-input">Foto do perfil <span class="optional">opcional · até 5 MB</span></label><input id="profile-avatar-input" name="avatar" type="file" accept="image/jpeg,image/png,image/webp"></div>
+          <fieldset class="profile-visibility-field">
+            <legend>Quem encontra seu mural?</legend>
+            <label class="visibility-option"><input type="radio" name="visibility" value="public" checked><span><strong>Público</strong><small>Aparece na lista inicial para receber cartinhas.</small></span></label>
+            <label class="visibility-option"><input type="radio" name="visibility" value="private"><span><strong>Privado · somente pelo link</strong><small>Não aparece na lista. Quem tiver o link poderá abrir e escrever.</small></span></label>
+          </fieldset>
+        </div>
+        <div class="profile-preview" aria-live="polite">
+          <div class="avatar-preview" id="avatar-preview"><span>✦</span></div>
+          <span class="profile-visibility-badge" id="profile-preview-visibility">Público</span>
+          <strong id="profile-preview-name">Seu nome</strong><p id="profile-preview-description">Seu mural vai ficar assim.</p>
+        </div>
+        <div class="form-actions profile-form-actions"><p class="form-message" id="profile-message" role="status" aria-live="polite"></p><button class="primary-button" id="create-profile-button" type="button">Gerar meu link <span aria-hidden="true">→</span></button></div>
+      </form>
+    </section>
+
+    <section class="composer-section" id="escrever" aria-labelledby="composer-title">
+      <div class="section-heading">
+        <span class="step">01</span>
+        <div><p class="eyebrow">papel, caneta, coragem</p><h2 id="composer-title">Escreva sua cartinha</h2></div>
+      </div>
+      <form class="composer" id="letter-form" novalidate>
+        <fieldset class="field recipient-field" id="recipient-field">
+          <legend>Para quem vai?</legend>
+          <input id="recipient" name="recipient" type="hidden">
+          <div class="recipient-options" id="recipient-options" role="radiogroup" aria-label="Escolha o destinatário">
+            <p class="recipient-loading">Carregando destinatários…</p>
+          </div>
+        </fieldset>
+        <div class="fixed-recipient" id="fixed-recipient" hidden><span>Para</span><strong id="fixed-recipient-name"></strong></div>
+        <div class="field letter-field">
+          <label for="letter-body">Sua mensagem</label>
+          <textarea id="letter-body" name="body" rows="7" maxlength="600" placeholder="Escreva algo que você gostaria que essa pessoa guardasse…" required></textarea>
+          <span class="counter" id="letter-counter">0 / 600</span>
+        </div>
+        <div class="privacy-note"><span aria-hidden="true">◌</span><p><strong>Seu nome não aparece.</strong> Não pedimos identidade para publicar. Evite incluir dados pessoais no texto.</p></div>
+        <div class="form-actions">
+          <p class="form-message" id="letter-message" role="status" aria-live="polite"></p>
+          <button class="primary-button" type="submit">Publicar no mural <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section class="wall-section" id="mural" aria-labelledby="wall-title">
+      <div class="section-heading wall-heading">
+        <div class="heading-pair"><span class="step">02</span><div><p class="eyebrow">recados que encontraram seu lugar</p><h2 id="wall-title">Mural de cartinhas</h2></div></div>
+        <label class="filter-label" id="recipient-filter-label" for="recipient-filter">Mostrar para
+          <select id="recipient-filter"><option value="">Todo mundo</option></select>
+        </label>
+      </div>
+      <div id="wall-status" class="wall-status" role="status" aria-live="polite">Abrindo as cartas…</div>
+      <div class="letter-grid" id="letter-grid" aria-live="polite"></div>
+      <div class="load-more-wrap"><button id="load-more" class="secondary-button" type="button" hidden>Ver mais cartinhas</button></div>
+    </section>
+  </main>
+
+  <footer><p>Feito para aproximar, não para expor. <span aria-hidden="true">✦</span></p></footer>
+
+  <dialog id="report-dialog" class="dialog">
+    <form method="dialog" id="report-form">
+      <button class="dialog-close" value="cancel" aria-label="Fechar">×</button>
+      <p class="eyebrow">cuidar também é carinho</p><h2>Denunciar cartinha</h2>
+      <input type="hidden" id="report-letter-id">
+      <label for="report-reason">O que aconteceu?</label>
+      <select id="report-reason" required><option value="abuse">Conteúdo ofensivo</option><option value="privacy">Expõe informação pessoal</option><option value="spam">Spam</option><option value="other">Outro motivo</option></select>
+      <p class="dialog-copy">A equipe de moderação verá a denúncia. Uma mesma pessoa só pode denunciar cada cartinha uma vez.</p>
+      <p id="report-message" class="form-message" role="status"></p>
+      <button class="danger-button" id="report-submit" type="submit">Enviar denúncia</button>
+    </form>
+  </dialog>
+
+  <dialog id="story-dialog" class="dialog story-dialog">
+    <button class="dialog-close" type="button" data-close-story aria-label="Fechar">×</button>
+    <p class="eyebrow">pronto para os stories</p><h2>Sua cartinha em PNG</h2>
+    <p class="dialog-copy">Formato vertical 1080 × 1920, gerado somente no seu navegador.</p>
+    <div class="story-preview-wrap" id="story-preview-wrap"><span>Gerando a arte…</span></div>
+    <p class="form-message" id="story-message" role="status"></p>
+    <a id="download-story" class="primary-button" download="cartinha-monarchy.png" hidden>Baixar PNG</a>
+  </dialog>
+
+  <dialog id="profile-success-dialog" class="dialog profile-created-dialog">
+    <button class="dialog-close" type="button" data-close-profile-success aria-label="Fechar">×</button>
+    <div class="profile-success-mark" aria-hidden="true">✓</div>
+    <p class="eyebrow">seu cantinho está pronto</p>
+    <h2>Seu mural foi criado!</h2>
+    <p class="dialog-copy">Guarde este endereço. Você também poderá encontrá-lo depois em <strong>Moderação → Perfis</strong>.</p>
+    <p class="profile-success-visibility" id="profile-success-visibility"></p>
+    <label for="generated-profile-link">Link permanente do seu mural</label>
+    <input id="generated-profile-link" readonly aria-label="Link do mural criado">
+    <div class="profile-created-actions">
+      <button id="copy-generated-link" class="secondary-button" type="button">Copiar link</button>
+      <a id="open-generated-link" class="primary-button">Abrir meu mural <span aria-hidden="true">→</span></a>
+    </div>
+  </dialog>
+
+  <dialog id="admin-dialog" class="dialog admin-dialog">
+    <button class="dialog-close" type="button" data-close-admin aria-label="Fechar">×</button>
+    <section id="admin-login-view">
+      <p class="eyebrow">acesso protegido</p><h2>Área da moderação</h2>
+      <p class="dialog-copy">O acesso é individual e auditado. A sessão fica somente nesta aba.</p>
+      <form id="login-form">
+        <label for="admin-username">Usuário</label><input id="admin-username" autocomplete="username" required>
+        <label for="admin-password">Senha</label><input id="admin-password" type="password" autocomplete="current-password" required>
+        <p id="login-message" class="form-message" role="status"></p>
+        <button class="primary-button" type="submit">Entrar</button>
+      </form>
+    </section>
+    <section id="admin-dashboard" hidden>
+      <div class="admin-title"><div><p class="eyebrow">painel de cuidado</p><h2>Moderação</h2><p id="admin-welcome"></p></div><button id="logout-button" class="secondary-button" type="button">Sair</button></div>
+      <div class="admin-tabs" role="tablist" aria-label="Seções da moderação">
+        <button role="tab" aria-selected="true" data-admin-tab="letters">Cartinhas</button>
+        <button role="tab" aria-selected="false" data-admin-tab="profiles">Perfis</button>
+        <button role="tab" aria-selected="false" data-admin-tab="moderators">Moderadores</button>
+        <button role="tab" aria-selected="false" data-admin-tab="audit">Histórico</button>
+      </div>
+      <div id="admin-panel" class="admin-panel"></div>
+    </section>
+  </dialog>
+
+  <template id="letter-template">
+    <article class="letter-card">
+      <div class="letter-top"><span class="recipient-pill"></span><button class="icon-button report-button" title="Denunciar cartinha" aria-label="Denunciar cartinha">•••</button></div>
+      <p class="letter-body"></p>
+      <div class="letter-bottom"><time></time><div class="letter-actions"><button class="story-button" type="button" aria-label="Criar imagem para story">Story ↗</button><button class="reaction-button" type="button" aria-label="Enviar carinho"><span aria-hidden="true">♥</span> <b>0</b></button></div></div>
+    </article>
+  </template>
+
+  <noscript><p class="startup-error">Ative o JavaScript para abrir as cartinhas.</p></noscript>
+  <script src="bootstrap.js"></script>
+  <script src="config.js"></script>
+  <script type="module" src="app.js?v=20260930-admin-visibility"></script>
+</body>
+</html>
