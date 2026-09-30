@@ -5,11 +5,11 @@ compatibility_date = "2026-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "monarchy-letters"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "8bdbf107-1257-4377-aa36-1a335a7b6a48"
 migrations_dir = "migrations"
 
 [vars]
-ALLOWED_ORIGINS = "http://localhost:8080"
+ALLOWED_ORIGINS = "http://localhost:8080,https://nycolas-galdino.github.io"
 SESSION_TTL_HOURS = "8"
 REPORT_AUTO_FLAG_THRESHOLD = "3"
 DUCKS_ALLOWED_HOSTS = "app.duckapps.com.br"

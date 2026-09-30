@@ -153,6 +153,10 @@ O IP bruto não é gravado. O backend calcula um fingerprint SHA-256 combinado c
 
 Fotos de perfil são armazenadas como BLOB no D1. A pessoa que cria o perfil deve ter direito de uso da imagem e compreender que ela será pública. Nome e descrição são sempre tratados como texto simples; a interface não interpreta HTML fornecido por usuários.
 
+## Política de custo
+
+Este projeto deve manter uma opção integralmente gratuita: GitHub Pages em repositório público, Cloudflare Workers Free e D1 Free. Não habilite Workers Paid, domínio pago ou recursos com cobrança automática como requisito de operação. Ao atingir um limite gratuito, prefira indisponibilidade temporária, redução de carga ou otimização de consultas; qualquer migração para serviço pago exige decisão explícita do proprietário.
+
 ## Limites e próximos endurecimentos
 
 - nenhum sistema conectado à internet pode prometer risco zero de invasão; as barreiras implementadas reduzem a superfície, mas exigem atualização, monitoramento e backup;
