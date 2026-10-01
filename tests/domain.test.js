@@ -40,6 +40,8 @@ describe("validation and security helpers", () => {
     expect(first).not.toContain("senha-de-teste-segura");
     await expect(verifyPassword("senha-de-teste-segura", first)).resolves.toBe(true);
     await expect(verifyPassword("senha-errada", first)).resolves.toBe(false);
+    const legacy = await hashPassword("senha-legada-segura", 210000);
+    await expect(verifyPassword("senha-legada-segura", legacy)).resolves.toBe(true);
     await expect(hashPassword("senha-de-teste-segura", 100001)).rejects.toThrow("unsupported_password_iterations");
   });
 

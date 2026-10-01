@@ -186,9 +186,10 @@ export function randomToken(byteLength = 32) {
 }
 
 export const PASSWORD_HASH_ITERATIONS = 100000;
+const LEGACY_PASSWORD_HASH_ITERATIONS = 210000;
 
 export async function hashPassword(password, iterations = PASSWORD_HASH_ITERATIONS, saltBytes) {
-  if (!Number.isSafeInteger(iterations) || iterations !== PASSWORD_HASH_ITERATIONS) {
+  if (![PASSWORD_HASH_ITERATIONS, LEGACY_PASSWORD_HASH_ITERATIONS].includes(iterations)) {
     throw new Error("unsupported_password_iterations");
   }
   const salt = saltBytes ?? crypto.getRandomValues(new Uint8Array(16));
@@ -211,8 +212,14 @@ export async function verifyPassword(password, encoded) {
   const [algorithm, iterationText, saltText, expectedText] = String(encoded).split("$");
   if (algorithm !== "pbkdf2_sha256" || !iterationText || !saltText || !expectedText) return false;
   const iterations = Number(iterationText);
-  if (iterations !== PASSWORD_HASH_ITERATIONS) return false;
-  const candidate = await hashPassword(password, iterations, base64UrlToBytes(saltText));
+  if (![PASSWORD_HASH_ITERATIONS, LEGACY_PASSWORD_HASH_ITERATIONS].includes(iterations)) return false;
+  let candidate;
+  try {
+    candidate = await hashPassword(password, iterations, base64UrlToBytes(saltText));
+  } catch (error) {
+    if (iterations === LEGACY_PASSWORD_HASH_ITERATIONS && error?.name === "NotSupportedError") return false;
+    throw error;
+  }
   const candidateBytes = new TextEncoder().encode(candidate);
   const expectedBytes = new TextEncoder().encode(encoded);
   if (candidateBytes.length !== expectedBytes.length) return false;
