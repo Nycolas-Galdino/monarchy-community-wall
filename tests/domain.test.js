@@ -74,8 +74,10 @@ describe("validation and security helpers", () => {
     expect(defaultVisibility.ok).toBe(true);
     expect(defaultVisibility.value.visibility).toBe("public");
     expect(defaultVisibility.value.letterVisibility).toBe("public");
+    expect(defaultVisibility.value.password).toBeNull();
     expect(validateProfileInput({ displayName: "Lila", description: "Meu mural", visibility: "private" }).value.visibility).toBe("private");
-    expect(validateProfileInput({ displayName: "Lila", letterVisibility: "protected" }).value.letterVisibility).toBe("protected");
+    expect(validateProfileInput({ displayName: "Lila", letterVisibility: "protected" }).ok).toBe(false);
+    expect(validateProfileInput({ displayName: "Lila", letterVisibility: "protected", password: "senha-inicial-segura" }).value.letterVisibility).toBe("protected");
     expect(validateProfileInput({ displayName: "Lila", description: "Meu mural", visibility: "secret" }).ok).toBe(false);
     expect(validateProfileInput({ displayName: "Lila", letterVisibility: "secret" }).ok).toBe(false);
     expect(validateProfileVisibilityInput({ visibility: "private" })).toEqual({ ok: true, value: { visibility: "private" } });
@@ -91,12 +93,14 @@ describe("validation and security helpers", () => {
 
   it("builds GitHub Pages compatible share links and wraps story copy", () => {
     expect(buildProfileShareUrl({ href: "https://grupo.github.io/Monarchy/?old=1#x" }, "lila-abc")).toBe("https://grupo.github.io/Monarchy/?profile=lila-abc");
-    expect(wrapStoryText("uma cartinha curta e bonita", 12)).toEqual(["uma cartinha", "curta e", "bonita"]);
+    expect(wrapStoryText("um recado curto e direto", 12)).toEqual(["um recado", "curto e", "direto"]);
     expect(validateProfileDraft({ displayName: "Lila", description: "", ducksUrl: "https://app.duckapps.com.br/lila" })).toBeNull();
     expect(validateProfileDraft({ displayName: "Lila", description: "", visibility: "private" })).toBeNull();
-    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "protected" })).toBeNull();
+    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "protected" })).toMatch(/Crie uma senha/);
+    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "protected", profilePassword: "senha-inicial-segura", profilePasswordConfirmation: "senha-inicial-segura" })).toBeNull();
+    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "protected", profilePassword: "senha-inicial-segura", profilePasswordConfirmation: "senha-diferente-segura" })).toMatch(/confirmação/);
     expect(validateProfileDraft({ displayName: "Lila", description: "", visibility: "secret" })).toMatch(/público ou privado/);
-    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "secret" })).toMatch(/abertas ou protegidas/);
+    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "secret" })).toMatch(/abertos ou protegidos/);
     expect(validateProfileDraft({ displayName: "Lila", description: "", ducksUrl: "http://app.duckapps.com.br/lila" })).toMatch(/HTTPS/);
     expect(validateProfileDraft({ displayName: "Lila", description: "", ducksUrl: "https://duckpps.com/c/lila" })).toMatch(/app\.duckapps\.com\.br/);
   });

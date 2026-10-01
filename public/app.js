@@ -10,7 +10,7 @@ import {
   saveProfileAccess,
   validateDraft,
   validateProfileDraft
-} from "./model.js?v=20261001-profile-access";
+} from "./model.js?v=20261001-anonymous-wall";
 const config = window.MONARCHY_WALL_CONFIG ?? {};
 const api = new WallApi(config.apiBaseUrl || window.location.origin);
 const profileSlug = new URL(window.location.href).searchParams.get("profile")?.trim() ?? "";
@@ -25,7 +25,7 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 function loadStoryTools() {
-  storyToolsPromise ??= import("./story.js");
+  storyToolsPromise ??= import("./story.js?v=20261001-anonymous-wall");
   return storyToolsPromise;
 }
 
@@ -118,7 +118,7 @@ async function loadRecipients() {
 
 function configureProfile(profile) {
   state.profile = profile;
-  document.title = `Cartinhas para ${profile.displayName} · Monarchy`;
+  document.title = `Recados para ${profile.displayName} · Monarchy`;
   $("#profile-identity").hidden = false;
   $("#profile-name").textContent = profile.displayName;
   $("#profile-avatar-fallback").textContent = profile.displayName.slice(0, 1).toUpperCase();
@@ -132,15 +132,15 @@ function configureProfile(profile) {
   if (profile.description) { $("#profile-description").textContent = profile.description; $("#profile-description").hidden = false; }
   $("#profile-links").hidden = false;
   if (profile.ducksUrl) { $("#profile-ducks-link").href = profile.ducksUrl; $("#profile-ducks-link").hidden = false; }
-  $("#hero-title").innerHTML = `Tem algo para ${escapeHtml(profile.displayName)}?<br><em>Deixe virar cartinha.</em>`;
-  $(".hero-intro").textContent = `Este é o mural de ${profile.displayName}. Escreva com carinho e publique sem revelar seu nome.`;
+  $("#hero-title").innerHTML = `Quer perguntar algo para ${escapeHtml(profile.displayName)}?<br><em>Envie anonimamente.</em>`;
+  $(".hero-intro").textContent = `Este é o mural de ${profile.displayName}. Envie uma pergunta, curiosidade ou recado sem revelar seu nome.`;
   $("#criar-perfil").hidden = true;
   $("#create-profile-nav").hidden = true;
   $("#recipient-field").hidden = true;
   $("#fixed-recipient").hidden = false;
   $("#fixed-recipient-name").textContent = profile.displayName;
   $("#recipient-filter-label").hidden = true;
-  $("#wall-title").textContent = `Cartinhas para ${profile.displayName}`;
+  $("#wall-title").textContent = `Recados para ${profile.displayName}`;
   state.profileAccessToken = readProfileAccess(window.localStorage, profile.slug);
 }
 
@@ -152,8 +152,8 @@ function showProfileLock() {
   $("#profile-unlock-form").hidden = !configured;
   $("#profile-password-pending").hidden = configured;
   $("#profile-lock-copy").textContent = configured
-    ? "Digite a senha do perfil para abrir as cartinhas neste navegador."
-    : "As cartinhas estão reservadas, mas o acesso ainda precisa ser configurado pela Staff.";
+    ? "Digite a senha do perfil para abrir os recados neste navegador."
+    : "Os recados estão reservados, mas o acesso ainda precisa ser configurado pela Staff.";
   $("#wall-status").textContent = "";
 }
 
@@ -173,7 +173,7 @@ function renderLetters() {
     const empty = document.createElement("div"); empty.className = "empty-state";
     const icon = document.createElement("span"); icon.textContent = "✉";
     const copy = document.createElement("p");
-    copy.textContent = state.profile ? `O mural de ${state.profile.displayName} espera a primeira cartinha.` : state.filter ? "Ainda não há cartinhas para essa pessoa." : "O mural está esperando a primeira cartinha.";
+    copy.textContent = state.profile ? `O mural de ${state.profile.displayName} espera o primeiro recado.` : state.filter ? "Ainda não há recados para essa pessoa." : "O mural está esperando o primeiro recado.";
     empty.append(icon, copy); grid.append(empty);
   }
   const template = $("#letter-template");
@@ -198,7 +198,7 @@ function renderLetters() {
 
 async function loadPublic({ append = false } = {}) {
   const status = $("#wall-status");
-  if (!append) status.textContent = "Abrindo as cartas…";
+  if (!append) status.textContent = "Abrindo os recados…";
   if (state.profile?.letterVisibility === "protected" && !state.profileAccessToken) {
     state.letters = [];
     showProfileLock();
@@ -248,7 +248,7 @@ async function react(letterId, button) {
   const count = $("b", button); button.disabled = true;
   try {
     const data = await api.react(letterId); count.textContent = data.reactions; button.classList.add("reacted");
-    button.setAttribute("aria-label", data.reacted ? "Carinho enviado" : "Você já enviou carinho");
+    button.setAttribute("aria-label", data.reacted ? "Marcado como interessante" : "Você já marcou como interessante");
   } catch (error) { button.title = error.message; }
   finally { button.disabled = false; }
 }
@@ -268,7 +268,7 @@ async function openStory(letter) {
     const { createStoryDataUrl, safeStoryFileName } = await loadStoryTools();
     const url = await createStoryDataUrl({ letter, profile, avatarUrl: state.profile?.hasAvatar ? api.profileAvatarUrl(state.profile.slug) : null });
     state.storyUrl = url;
-    const preview = new Image(); preview.src = url; preview.alt = `Prévia da cartinha para ${profile.displayName}`;
+    const preview = new Image(); preview.src = url; preview.alt = `Prévia do recado para ${profile.displayName}`;
     wrap.replaceChildren(preview); download.href = url; download.download = safeStoryFileName(profile.displayName); download.hidden = false;
   } catch (error) { wrap.replaceChildren(); setMessage($("#story-message"), `Não foi possível gerar o PNG: ${error.message}`, "error"); }
 }
@@ -280,7 +280,7 @@ async function submitLetter(event) {
   const body = form.body.value;
   const error = validateDraft(recipient, body);
   if (error) return setMessage($("#letter-message"), error, "error");
-  const button = $("button[type=submit]", form); setBusy(button, true, "Publicando…"); setMessage($("#letter-message"), "Selando o envelope…");
+  const button = $("button[type=submit]", form); setBusy(button, true, "Enviando…"); setMessage($("#letter-message"), "Publicando anonimamente…");
   try {
     const selectedRecipient = state.recipients.find((item) => item.slug === recipient);
     if (state.profile) await api.createProfileLetter(state.profile.slug, body, createIdempotencyKey());
@@ -288,9 +288,9 @@ async function submitLetter(event) {
     form.reset(); $("#letter-counter").textContent = `0 / ${LETTER_MAX_LENGTH}`;
     selectRecipient();
     if (!state.profile && selectedRecipient?.kind === "profile") {
-      setMessage($("#letter-message"), `Cartinha enviada para ${selectedRecipient.name}. Ela já está no mural pessoal!`, "success");
+      setMessage($("#letter-message"), `Recado enviado para ${selectedRecipient.name}. Ele já está no mural pessoal!`, "success");
     } else {
-      setMessage($("#letter-message"), "Cartinha publicada. Ela já está no mural!", "success");
+      setMessage($("#letter-message"), "Recado publicado. Ele já está no mural!", "success");
       state.page = 1; await loadPublic(); $("#mural").scrollIntoView({ behavior: "smooth", block: "start" });
     }
   } catch (requestError) { setMessage($("#letter-message"), requestError.message, "error"); }
@@ -306,6 +306,8 @@ async function submitProfile(event) {
     ducksUrl: form.ducksUrl.value,
     visibility: form.visibility.value,
     letterVisibility: form.letterVisibility.value,
+    profilePassword: form.profilePassword.value,
+    profilePasswordConfirmation: form.profilePasswordConfirmation.value,
     avatarFile: form.avatar.files[0] ?? null
   };
   const validationError = validateProfileDraft(values);
@@ -313,18 +315,26 @@ async function submitProfile(event) {
   const button = $("#create-profile-button"); setBusy(button, true, "Criando…"); setMessage($("#profile-message"), values.avatarFile ? "Otimizando a foto com segurança…" : "Preparando seu mural…");
   try {
     const avatar = values.avatarFile ? await (await loadStoryTools()).prepareAvatar(values.avatarFile) : null;
-    const data = await api.createProfile({ displayName: values.displayName, description: values.description, ducksUrl: values.ducksUrl, visibility: values.visibility, letterVisibility: values.letterVisibility, avatar }, state.profileKey);
+    const data = await api.createProfile({
+      displayName: values.displayName,
+      description: values.description,
+      ducksUrl: values.ducksUrl,
+      visibility: values.visibility,
+      letterVisibility: values.letterVisibility,
+      password: values.letterVisibility === "protected" ? values.profilePassword : undefined,
+      avatar
+    }, state.profileKey);
     const link = buildProfileShareUrl(window.location, data.slug);
     $("#generated-profile-link").value = link; $("#open-generated-link").href = link;
     const discoveryCopy = values.visibility === "private"
       ? "O mural não será listado na página inicial."
       : "O mural aparecerá na lista inicial de destinatários.";
     const readingCopy = values.letterVisibility === "protected"
-      ? " As cartinhas ficarão protegidas assim que a Staff definir uma senha no painel ADM."
-      : " As cartinhas terão leitura aberta.";
+      ? " Os recados já estão protegidos pela senha que você criou. Guarde-a bem: a Staff não poderá consultá-la, apenas substituí-la."
+      : " Os recados terão leitura aberta.";
     $("#profile-success-visibility").textContent = `${discoveryCopy}${readingCopy}`;
     state.profileKey = createIdempotencyKey();
-    form.reset(); $("#profile-description-counter").textContent = `0 / ${PROFILE_DESCRIPTION_MAX_LENGTH}`; updateProfilePreview(); updateAvatarPreview(null);
+    form.reset(); $("#profile-description-counter").textContent = `0 / ${PROFILE_DESCRIPTION_MAX_LENGTH}`; updateProfilePreview(); updateProfilePasswordFields(); updateAvatarPreview(null);
     await loadRecipients();
     setMessage($("#profile-message"));
     $("#profile-success-dialog").showModal();
@@ -336,7 +346,7 @@ async function submitReport(event) {
   event.preventDefault(); const button = $("#report-submit"); setBusy(button, true, "Enviando…");
   try {
     const data = await api.report($("#report-letter-id").value, $("#report-reason").value);
-    setMessage($("#report-message"), data.duplicate ? "Você já denunciou esta cartinha." : "Denúncia enviada para a moderação.", "success");
+    setMessage($("#report-message"), data.duplicate ? "Você já denunciou este recado." : "Denúncia enviada para a moderação.", "success");
     setTimeout(() => $("#report-dialog").close(), 900);
   } catch (error) { setMessage($("#report-message"), error.message, "error"); }
   finally { setBusy(button, false); }
@@ -373,7 +383,7 @@ function createAdminLetterCard(letter) {
   const meta = document.createElement("span"); meta.textContent = `${letter.recipient_name}${letter.profile_slug ? ` · perfil ${letter.profile_slug}` : ""} · ${formatDate(letter.created_at)}`;
   const badge = document.createElement("span"); badge.className = `status-badge status-${letter.status}`; badge.textContent = letter.status; header.append(meta, badge);
   const quote = document.createElement("blockquote"); quote.textContent = letter.body;
-  const stats = document.createElement("p"); stats.className = "form-message"; stats.textContent = `${letter.report_count} denúncia(ões) · ${letter.reaction_count} carinho(s)${letter.moderation_note ? ` · Nota: ${letter.moderation_note}` : ""}`;
+  const stats = document.createElement("p"); stats.className = "form-message"; stats.textContent = `${letter.report_count} denúncia(ões) · ${letter.reaction_count} marcação(ões)${letter.moderation_note ? ` · Nota: ${letter.moderation_note}` : ""}`;
   const actions = document.createElement("div"); actions.className = "admin-actions";
   for (const [status, label] of [["published", "Publicar"], ["hidden", "Ocultar"], ["deleted", "Excluir"]]) {
     if (status === letter.status) continue;
@@ -390,13 +400,13 @@ function createAdminLetterCard(letter) {
 async function renderAdminLetters() {
   const panel = $("#admin-panel"); panel.replaceChildren();
   const toolbar = document.createElement("div"); toolbar.className = "admin-toolbar";
-  const title = document.createElement("strong"); title.textContent = "Conteúdo do mural";
+  const title = document.createElement("strong"); title.textContent = "Perguntas e recados do mural";
   const filter = document.createElement("select"); filter.setAttribute("aria-label", "Filtrar por status");
   for (const [value, label] of [["all", "Todos"], ["published", "Publicados"], ["hidden", "Ocultos"], ["deleted", "Excluídos"]]) filter.add(new Option(label, value));
   toolbar.append(title, filter); panel.append(toolbar); const list = document.createElement("div"); list.className = "admin-list"; panel.append(list);
   async function refresh() {
     list.textContent = "Carregando…";
-    try { const data = await api.adminLetters(filter.value); list.replaceChildren(); if (!data.letters.length) list.textContent = "Nenhuma cartinha neste estado."; else data.letters.forEach((letter) => list.append(createAdminLetterCard(letter))); }
+    try { const data = await api.adminLetters(filter.value); list.replaceChildren(); if (!data.letters.length) list.textContent = "Nenhum recado neste estado."; else data.letters.forEach((letter) => list.append(createAdminLetterCard(letter))); }
     catch (error) { adminError(error); }
   }
   filter.addEventListener("change", refresh); await refresh();
@@ -419,7 +429,7 @@ async function renderAdminProfiles() {
         const header = document.createElement("header"); const name = document.createElement("strong"); name.textContent = profile.display_name;
         const badge = document.createElement("span"); badge.className = `status-badge status-${profile.status}`; badge.textContent = profile.status; header.append(name, badge);
         const copy = document.createElement("p"); copy.textContent = profile.description || "Sem descrição.";
-        const stats = document.createElement("p"); stats.className = "form-message"; stats.textContent = `${profile.letter_count} cartinha(s) · ${profile.visibility === "private" ? "privado pelo link" : "público"} · cartinhas ${profile.letter_visibility === "protected" ? "protegidas" : "abertas"} · criado em ${formatDate(profile.created_at)}${profile.ducks_url ? " · Ducks informado" : ""}`;
+        const stats = document.createElement("p"); stats.className = "form-message"; stats.textContent = `${profile.letter_count} recado(s) · ${profile.visibility === "private" ? "privado pelo link" : "público"} · recados ${profile.letter_visibility === "protected" ? "protegidos" : "abertos"} · criado em ${formatDate(profile.created_at)}${profile.ducks_url ? " · Ducks informado" : ""}`;
         const visibilityControl = document.createElement("div"); visibilityControl.className = "admin-visibility-control";
         const visibilityLabel = document.createElement("strong"); visibilityLabel.textContent = "Visibilidade";
         const visibilityButtons = document.createElement("div"); visibilityButtons.className = "admin-visibility-buttons";
@@ -443,7 +453,7 @@ async function renderAdminProfiles() {
         }
         visibilityControl.append(visibilityLabel, visibilityButtons);
         const letterAccessControl = document.createElement("div"); letterAccessControl.className = "admin-visibility-control";
-        const letterAccessLabel = document.createElement("strong"); letterAccessLabel.textContent = "Leitura das cartinhas";
+        const letterAccessLabel = document.createElement("strong"); letterAccessLabel.textContent = "Leitura dos recados";
         const letterAccessButtons = document.createElement("div"); letterAccessButtons.className = "admin-visibility-buttons";
         for (const [letterVisibility, label] of [["public", "Aberta"], ["protected", "Protegida"]]) {
           const accessButton = document.createElement("button");
@@ -465,9 +475,9 @@ async function renderAdminProfiles() {
         const passwordInfo = document.createElement("p");
         passwordInfo.textContent = profile.password_configured
           ? "Senha definida. Ela não pode ser visualizada; redefini-la revoga todos os acessos salvos."
-          : "Nenhuma senha definida. Enquanto isso, ninguém consegue abrir as cartinhas protegidas.";
+          : "Nenhuma senha definida. Enquanto isso, ninguém consegue abrir os recados protegidos.";
         const passwordForm = document.createElement("form"); passwordForm.className = "admin-password-form";
-        const passwordInput = document.createElement("input"); passwordInput.type = "password"; passwordInput.minLength = 12; passwordInput.maxLength = 128; passwordInput.required = true; passwordInput.autocomplete = "off"; passwordInput.readOnly = true; passwordInput.placeholder = "Nova senha · mínimo 12 caracteres"; passwordInput.setAttribute("data-1p-ignore", "true"); passwordInput.setAttribute("data-lpignore", "true"); passwordInput.setAttribute("aria-label", `Nova senha das cartinhas de ${profile.display_name}`);
+        const passwordInput = document.createElement("input"); passwordInput.type = "password"; passwordInput.minLength = 12; passwordInput.maxLength = 128; passwordInput.required = true; passwordInput.autocomplete = "off"; passwordInput.readOnly = true; passwordInput.placeholder = "Nova senha · mínimo 12 caracteres"; passwordInput.setAttribute("data-1p-ignore", "true"); passwordInput.setAttribute("data-lpignore", "true"); passwordInput.setAttribute("aria-label", `Nova senha dos recados de ${profile.display_name}`);
         passwordInput.addEventListener("focus", () => { passwordInput.readOnly = false; passwordInput.value = ""; }, { once: true });
         const passwordButton = document.createElement("button"); passwordButton.type = "submit"; passwordButton.className = "secondary-button"; passwordButton.textContent = profile.password_configured ? "Redefinir senha" : "Definir senha";
         passwordForm.append(passwordInput, passwordButton);
@@ -549,6 +559,17 @@ function updateProfilePreview() {
   $("#profile-preview-visibility").textContent = $("input[name=visibility]:checked").value === "private" ? "Privado · somente pelo link" : "Público";
 }
 
+function updateProfilePasswordFields() {
+  const protectedSelected = $("input[name=letterVisibility]:checked").value === "protected";
+  const container = $("#profile-password-fields");
+  container.hidden = !protectedSelected;
+  for (const input of $$("input", container)) {
+    input.disabled = !protectedSelected;
+    input.required = protectedSelected;
+    if (!protectedSelected) input.value = "";
+  }
+}
+
 function updateAvatarPreview(file) {
   if (state.avatarPreviewUrl) URL.revokeObjectURL(state.avatarPreviewUrl);
   const preview = $("#avatar-preview"); preview.replaceChildren();
@@ -568,7 +589,7 @@ function bindEvents() {
   $("#profile-display-name").addEventListener("input", updateProfilePreview);
   $("#profile-description-input").addEventListener("input", (event) => { $("#profile-description-counter").textContent = `${Array.from(event.target.value).length} / ${PROFILE_DESCRIPTION_MAX_LENGTH}`; updateProfilePreview(); });
   $$("input[name=visibility]").forEach((input) => input.addEventListener("change", updateProfilePreview));
-  $$("input[name=letterVisibility]").forEach((input) => input.addEventListener("change", updateProfilePreview));
+  $$("input[name=letterVisibility]").forEach((input) => input.addEventListener("change", () => { updateProfilePreview(); updateProfilePasswordFields(); }));
   $("#profile-avatar-input").addEventListener("change", (event) => updateAvatarPreview(event.target.files[0] ?? null));
   $("#copy-generated-link").addEventListener("click", (event) => copyText($("#generated-profile-link").value, event.currentTarget));
   $("[data-close-profile-success]").addEventListener("click", () => $("#profile-success-dialog").close());
@@ -586,6 +607,7 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  updateProfilePasswordFields();
   window.MONARCHY_WALL_BOOTSTRAP?.markReady?.();
   if (adminRequested) openAdmin();
   if (state.profileSlug) {

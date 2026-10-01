@@ -1,6 +1,6 @@
-# Correio da Comunidade
+# Mural Anônimo da Comunidade
 
-Mural público de cartinhas anônimas, separado do narrador de RPG. O frontend é estático e pode ser publicado no GitHub Pages; a API roda em um Cloudflare Worker e grava perfis, fotos, cartinhas, moderação, denúncias, reações, sessões e auditoria em **Cloudflare D1 (SQLite)**.
+Mural público de perguntas e recados anônimos, separado do narrador de RPG. O frontend é estático e pode ser publicado no GitHub Pages; a API roda em um Cloudflare Worker e grava perfis, fotos, recados, moderação, denúncias, reações, sessões e auditoria em **Cloudflare D1 (SQLite)**.
 
 ## Arquitetura
 
@@ -14,32 +14,32 @@ Cloudflare Worker (API e autorização)
 Cloudflare D1 / SQLite
 ```
 
-O Pages nunca recebe hash de senha, segredo do Worker ou acesso direto ao banco. O token opaco recebido no login administrativo fica somente na memória da aba. Para cartinhas protegidas, a senha digitada é enviada apenas para validação e nunca é salva pelo frontend; o navegador persiste, separadamente por perfil, somente uma chave opaca com validade configurável. O servidor guarda apenas hashes SHA-256 dos tokens e hashes PBKDF2 das senhas.
+O Pages nunca recebe hash de senha, segredo do Worker ou acesso direto ao banco. O token opaco recebido no login administrativo fica somente na memória da aba. Para recados protegidos, o dono cria a senha inicial junto com o perfil; ela é enviada apenas para hash no Worker e nunca é devolvida ou salva pelo frontend. Depois do desbloqueio, o navegador persiste, separadamente por perfil, somente uma chave opaca com validade configurável. O servidor guarda apenas hashes SHA-256 dos tokens e hashes PBKDF2 das senhas.
 
 ## O que está incluído
 
 - mural responsivo com filtros, paginação e estados vazio/carregando/erro/sucesso;
 - seletor visual de destinatários com Staff, Toda a comunidade e perfis ativos, incluindo a foto pública do perfil quando disponível;
 - perfis pessoais com link único no formato `?profile=nome-identificador`, compatível com GitHub Pages;
-- perfil público por padrão ou privado não listado; perfis privados continuam acessíveis e recebem cartinhas somente pelo link direto;
-- leitura das cartinhas aberta por padrão ou protegida por senha, independentemente de o perfil ser listado ou não;
+- perfil público por padrão ou privado não listado; perfis privados continuam acessíveis e recebem recados somente pelo link direto;
+- leitura dos recados aberta por padrão ou protegida pela senha inicial criada e confirmada pelo dono, independentemente de o perfil ser listado ou não;
 - nome obrigatório e descrição, link Ducks e foto opcionais; o servidor aceita somente URLs HTTPS no domínio `app.duckapps.com.br`;
 - foto redimensionada no navegador, limitada a 350 KB no backend e validada também pela assinatura real do arquivo;
-- mural pessoal isolado: suas cartinhas não aparecem no mural comunitário e perfis ocultos deixam de responder publicamente;
+- mural pessoal isolado: seus recados não aparecem no mural comunitário e perfis ocultos deixam de responder publicamente;
 - geração local de PNG vertical 1080 × 1920 para stories, sem enviar a arte pronta a terceiros;
 - publicação sem nome do remetente, limitada a 600 caracteres e idempotente;
-- reação anônima persistida (um “carinho” por origem e cartinha);
+- marcação anônima persistida (uma marca de interesse por origem e recado);
 - denúncia por motivo, deduplicada, com ocultação automática configurável;
-- painel para listar, publicar, ocultar ou excluir logicamente cartinhas;
+- painel para listar, publicar, ocultar ou excluir logicamente recados;
 - área de moderação fora da navegação pública, acessível por `moderacao.html` e ainda protegida por login;
-- histórico administrativo de perfis com data, status, quantidade de cartinhas e ações para copiar ou abrir cada link;
+- histórico administrativo de perfis com data, status, quantidade de recados e ações para copiar ou abrir cada link;
 - alteração auditada entre perfil público e privado diretamente no histórico administrativo, com controles responsivos para celular;
-- definição e redefinição de senha das cartinhas apenas pelo painel administrativo; o painel mostra somente se há senha, nunca seu conteúdo ou hash, e toda redefinição revoga acessos salvos;
+- senha inicial dos recados definida pelo dono durante a criação; a moderação pode apenas substituí-la, nunca consultar a antiga, e toda redefinição revoga acessos salvos;
 - várias contas de moderação, criação, desativação e encerramento das sessões desativadas;
 - senhas PBKDF2-SHA256 com salt aleatório e 100 mil iterações, o máximo aceito pelo runtime Workers;
 - sessões de até 8 horas, CORS por lista explícita, limites por origem e trilha de auditoria;
 - proteção de login e desbloqueio de perfil contra força bruta, com limite de 10 tentativas por 15 minutos por origem pseudonimizada;
-- limites de 3 perfis por hora e 5 cartinhas por mural a cada 10 minutos por origem pseudonimizada;
+- limites de 3 perfis por hora e 5 recados por mural a cada 10 minutos por origem pseudonimizada;
 - dados do usuário sempre renderizados com `textContent`, sem interpretar HTML;
 - migrações SQL versionadas e testes de integração no runtime local do Cloudflare.
 
@@ -81,7 +81,7 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:8787/api/admin/bootstrap" 
 
 Depois disso, novos moderadores são criados no próprio painel.
 
-O acesso local da equipe é `http://localhost:8080/moderacao.html`. Em produção, acrescente `/moderacao.html` ao endereço publicado pelo GitHub Pages. O endereço não substitui autenticação: ele apenas deixa a entrada administrativa fora da navegação pública. Na aba **Perfis**, a equipe pode alternar a leitura entre aberta/protegida e definir uma nova senha. A senha nunca volta à tela; use **Redefinir senha** quando necessário.
+O acesso local da equipe é `http://localhost:8080/moderacao.html`. Em produção, acrescente `/moderacao.html` ao endereço publicado pelo GitHub Pages. O endereço não substitui autenticação: ele apenas deixa a entrada administrativa fora da navegação pública. Na aba **Perfis**, a equipe pode alternar a leitura entre aberta/protegida e definir uma nova senha. A senha anterior nunca volta à tela; use **Redefinir senha** quando necessário.
 
 ## Validação
 
@@ -156,7 +156,7 @@ O IP bruto não é gravado. O backend calcula um fingerprint SHA-256 combinado c
 
 Fotos de perfil são armazenadas como BLOB no D1. A pessoa que cria o perfil deve ter direito de uso da imagem e compreender que ela será pública. Nome e descrição são sempre tratados como texto simples; a interface não interpreta HTML fornecido por usuários.
 
-As senhas de perfil não são recuperáveis: somente podem ser substituídas pela moderação. A chave opaca de leitura fica em `localStorage` sob um mapa por slug, permitindo liberar mais de um perfil no mesmo navegador. Limpar os dados do site, trocar de navegador, expirar a chave ou redefinir a senha exige novo desbloqueio.
+As senhas de perfil não são recuperáveis: a inicial é criada pelo dono e depois somente pode ser substituída pela moderação. A interface exibe esse aviso ao lado do campo e exige confirmação para reduzir erros de digitação. A chave opaca de leitura fica em `localStorage` sob um mapa por slug, permitindo liberar mais de um perfil no mesmo navegador. Limpar os dados do site, trocar de navegador, expirar a chave ou redefinir a senha exige novo desbloqueio.
 
 ## Política de custo
 

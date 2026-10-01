@@ -82,7 +82,7 @@ describe("community wall API", () => {
       headers: { "idempotency-key": profileKey, "cf-connecting-ip": "192.0.2.60" },
       body: {
         displayName: "Lila Monarchy",
-        description: "Pergunte com carinho.",
+        description: "Pergunte anonimamente.",
         ducksUrl: "https://app.duckapps.com.br/lila#bio",
         avatar: { mediaType: "image/png", data: avatarData }
       }
@@ -96,7 +96,7 @@ describe("community wall API", () => {
       headers: { "idempotency-key": profileKey, "cf-connecting-ip": "192.0.2.60" },
       body: {
         displayName: "Lila Monarchy",
-        description: "Pergunte com carinho.",
+        description: "Pergunte anonimamente.",
         ducksUrl: "https://app.duckapps.com.br/lila#bio",
         avatar: { mediaType: "image/png", data: avatarData }
       }
@@ -124,7 +124,7 @@ describe("community wall API", () => {
     const profileLetter = await request("/letters", {
       method: "POST",
       headers: { "idempotency-key": "test_profile_letter_123456789", "cf-connecting-ip": "192.0.2.61" },
-      body: { recipient: profileSlug, body: "Essa cartinha aparece somente no mural pessoal." }
+      body: { recipient: profileSlug, body: "Esse recado aparece somente no mural pessoal." }
     });
     expect(profileLetter.status).toBe(201);
     const profileList = await request(`/profiles/${profileSlug}/letters`);
@@ -162,30 +162,27 @@ describe("community wall API", () => {
     const protectedCreated = await request("/profiles", {
       method: "POST",
       headers: { "idempotency-key": "test_protected_profile_123456", "cf-connecting-ip": "192.0.2.80" },
-      body: { displayName: "Mural Protegido", letterVisibility: "protected" }
+      body: { displayName: "Mural Protegido", letterVisibility: "protected", password: "senha-inicial-do-perfil" }
     });
     expect(protectedCreated.status).toBe(201);
     const protectedSlug = (await protectedCreated.json()).slug;
     const protectedMetadata = (await (await request(`/profiles/${protectedSlug}`)).json()).profile;
-    expect(protectedMetadata).toMatchObject({ letterVisibility: "protected", passwordConfigured: false });
+    expect(protectedMetadata).toMatchObject({ letterVisibility: "protected", passwordConfigured: true });
     expect(protectedMetadata).not.toHaveProperty("letter_password_hash");
     const protectedLetter = await request(`/profiles/${protectedSlug}/letters`, {
       method: "POST",
       headers: { "idempotency-key": "protected_letter_key_123456", "cf-connecting-ip": "192.0.2.81" },
-      body: { body: "Esta cartinha exige o acesso do perfil para leitura." }
+      body: { body: "Este recado exige o acesso do perfil para leitura." }
     });
     expect(protectedLetter.status).toBe(201);
     expect((await request(`/profiles/${protectedSlug}/letters`)).status).toBe(401);
 
     const profilesAdmin = await request("/admin/profiles", { token });
     const protectedAdmin = (await profilesAdmin.clone().json()).profiles.find((item) => item.slug === protectedSlug);
-    expect(protectedAdmin).toMatchObject({ letter_visibility: "protected", password_configured: 0 });
+    expect(protectedAdmin).toMatchObject({ letter_visibility: "protected", password_configured: 1 });
     expect(protectedAdmin).not.toHaveProperty("letter_password_hash");
     expect(protectedAdmin).not.toHaveProperty("password");
     expect((await request(`/admin/profiles/${protectedAdmin.id}/letter-password`, { method: "PUT", token, body: { password: "curta" } })).status).toBe(422);
-    const passwordSet = await request(`/admin/profiles/${protectedAdmin.id}/letter-password`, { method: "PUT", token, body: { password: "senha-inicial-do-perfil" } });
-    expect(passwordSet.status).toBe(200);
-    expect(await passwordSet.json()).toEqual({ updated: true, letterVisibility: "protected", passwordConfigured: true });
     const protectedAfterPassword = (await (await request(`/profiles/${protectedSlug}`)).json()).profile;
     expect(protectedAfterPassword.passwordConfigured).toBe(true);
     expect(protectedAfterPassword).not.toHaveProperty("letterPasswordHash");
@@ -273,6 +270,12 @@ describe("community wall API", () => {
       body: { displayName: "Imagem falsa", avatar: { mediaType: "image/png", data: btoa("not a png") } }
     });
     expect(fakeImage.status).toBe(422);
+    const protectedWithoutPassword = await request("/profiles", {
+      method: "POST",
+      headers: { "idempotency-key": "missing_profile_password_1234", "cf-connecting-ip": "192.0.2.52" },
+      body: { displayName: "Sem senha", letterVisibility: "protected" }
+    });
+    expect(protectedWithoutPassword.status).toBe(422);
   });
 
   it("returns generic credentials errors and rate-limits brute force", async () => {

@@ -1,4 +1,4 @@
-import { wrapStoryText } from "./model.js";
+import { wrapStoryText } from "./model.js?v=20261001-anonymous-wall";
 
 const MAX_AVATAR_BYTES = 350 * 1024;
 
@@ -85,7 +85,7 @@ export async function createStoryDataUrl({ letter, profile, avatarUrl }) {
   const gradient = context.createLinearGradient(0, 0, 1080, 1920);
   gradient.addColorStop(0, "#160c3d");
   gradient.addColorStop(.46, "#5a218f");
-  gradient.addColorStop(1, "#ed2d91");
+  gradient.addColorStop(1, "#17627f");
   context.fillStyle = gradient;
   context.fillRect(0, 0, 1080, 1920);
 
@@ -106,7 +106,7 @@ export async function createStoryDataUrl({ letter, profile, avatarUrl }) {
   context.fillText("MONARCHY COMMUNITY", 540, 104);
   context.fillStyle = "#28c5f4";
   context.font = "800 26px system-ui, sans-serif";
-  context.fillText("UMA CARTINHA ANÔNIMA CHEGOU ✦", 540, 170);
+  context.fillText("UM RECADO ANÔNIMO CHEGOU ✦", 540, 170);
 
   const avatar = await loadRemoteImage(avatarUrl);
   context.save();
@@ -123,18 +123,18 @@ export async function createStoryDataUrl({ letter, profile, avatarUrl }) {
   roundedRect(context, 90, 610, 900, 910, 58);
   context.fillStyle = "rgba(255,255,255,.94)"; context.fill();
   context.strokeStyle = "rgba(255,255,255,.7)"; context.lineWidth = 6; context.stroke();
-  context.fillStyle = "#e8328b"; context.font = "800 64px system-ui, sans-serif"; context.fillText("♥", 540, 735);
+  context.fillStyle = "#762bc0"; context.font = "800 64px system-ui, sans-serif"; context.fillText("?", 540, 735);
 
   const roughLines = wrapStoryText(letter.body, 27).length;
   const fontSize = roughLines > 11 ? 48 : roughLines > 8 ? 56 : 66;
-  context.fillStyle = "#27154f";
+  context.fillStyle = "#17101f";
   context.font = `700 ${fontSize}px Georgia, serif`;
   context.textBaseline = "top";
   drawWrappedText(context, letter.body, 540, 825, 740, fontSize * 1.35, 12);
 
   context.textBaseline = "alphabetic";
   context.fillStyle = "rgba(255,255,255,.9)"; context.font = "600 28px system-ui, sans-serif";
-  context.fillText("Responda no seu mural e compartilhe nos stories", 540, 1695);
+  context.fillText("Pergunte, responda e compartilhe nos stories", 540, 1695);
   context.fillStyle = "#25cdf4"; context.font = "800 36px system-ui, sans-serif";
   context.fillText("MONARCHY ✦", 540, 1780);
   return canvas.toDataURL("image/png");
@@ -142,5 +142,5 @@ export async function createStoryDataUrl({ letter, profile, avatarUrl }) {
 
 export function safeStoryFileName(displayName) {
   const safe = String(displayName).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
-  return `cartinha-${safe || "monarchy"}.png`;
+  return `recado-${safe || "monarchy"}.png`;
 }

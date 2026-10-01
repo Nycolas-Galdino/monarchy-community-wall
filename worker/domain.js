@@ -36,7 +36,7 @@ export function validateLetterInput(input) {
   }
   const length = textLength(body);
   if (length < LETTER_MIN_LENGTH || length > LETTER_MAX_LENGTH) {
-    return { ok: false, error: `A cartinha deve ter entre ${LETTER_MIN_LENGTH} e ${LETTER_MAX_LENGTH} caracteres.` };
+    return { ok: false, error: `O recado deve ter entre ${LETTER_MIN_LENGTH} e ${LETTER_MAX_LENGTH} caracteres.` };
   }
   return { ok: true, value: { body, recipient } };
 }
@@ -107,8 +107,10 @@ export function validateProfileInput(input, configuredHosts) {
     return { ok: false, error: "Escolha se o perfil será público ou privado." };
   }
   if (!PROFILE_LETTER_VISIBILITIES.has(letterVisibility)) {
-    return { ok: false, error: "Escolha se as cartinhas serão abertas ou protegidas." };
+    return { ok: false, error: "Escolha se os recados serão abertos ou protegidos." };
   }
+  const password = letterVisibility === "protected" ? validateProfilePasswordInput(input) : { ok: true, value: { password: null } };
+  if (!password.ok) return { ok: false, error: "Crie uma senha de 12 a 128 caracteres para proteger os recados." };
   const avatar = input?.avatar ?? null;
   if (avatar !== null) {
     if (!AVATAR_MEDIA_TYPES.has(avatar?.mediaType) || typeof avatar?.data !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(avatar.data)) {
@@ -118,7 +120,7 @@ export function validateProfileInput(input, configuredHosts) {
       return { ok: false, error: "A foto deve ter no máximo 350 KB após otimização." };
     }
   }
-  return { ok: true, value: { displayName, description: description || null, ducksUrl: ducksUrl.value, visibility, letterVisibility, avatar } };
+  return { ok: true, value: { displayName, description: description || null, ducksUrl: ducksUrl.value, visibility, letterVisibility, password: password.value.password, avatar } };
 }
 
 export function decodeAndValidateAvatar(avatar) {
@@ -155,7 +157,7 @@ export function validateProfileVisibilityInput(input) {
 export function validateProfileLetterVisibilityInput(input) {
   const letterVisibility = String(input?.letterVisibility ?? "").trim().toLowerCase();
   if (!PROFILE_LETTER_VISIBILITIES.has(letterVisibility)) {
-    return { ok: false, error: "A leitura das cartinhas deve ser aberta ou protegida." };
+    return { ok: false, error: "A leitura dos recados deve ser aberta ou protegida." };
   }
   return { ok: true, value: { letterVisibility } };
 }

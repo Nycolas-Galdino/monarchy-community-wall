@@ -3,6 +3,8 @@ export const PROFILE_NAME_MAX_LENGTH = 60;
 export const PROFILE_DESCRIPTION_MAX_LENGTH = 240;
 export const AVATAR_SOURCE_MAX_BYTES = 5 * 1024 * 1024;
 export const DUCKS_ALLOWED_HOST = "app.duckapps.com.br";
+export const PROFILE_PASSWORD_MIN_LENGTH = 12;
+export const PROFILE_PASSWORD_MAX_LENGTH = 128;
 
 export function normalizeDraft(value) {
   return String(value ?? "").replace(/\r\n?/g, "\n").trim();
@@ -11,7 +13,7 @@ export function normalizeDraft(value) {
 export function validateDraft(recipient, body) {
   const normalized = normalizeDraft(body);
   const length = Array.from(normalized).length;
-  if (!recipient) return "Escolha para quem vai a cartinha.";
+  if (!recipient) return "Escolha para quem vai o recado.";
   if (length < 3) return "Escreva pelo menos 3 caracteres.";
   if (length > LETTER_MAX_LENGTH) return `Use no máximo ${LETTER_MAX_LENGTH} caracteres.`;
   return null;
@@ -28,13 +30,18 @@ export function createIdempotencyKey() {
   return `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
 }
 
-export function validateProfileDraft({ displayName, description, ducksUrl, visibility = "public", letterVisibility = "public", avatarFile }) {
+export function validateProfileDraft({ displayName, description, ducksUrl, visibility = "public", letterVisibility = "public", profilePassword = "", profilePasswordConfirmation = "", avatarFile }) {
   const nameLength = Array.from(normalizeDraft(displayName)).length;
   const descriptionLength = Array.from(normalizeDraft(description)).length;
   if (nameLength < 2 || nameLength > PROFILE_NAME_MAX_LENGTH) return "O nome do perfil deve ter entre 2 e 60 caracteres.";
   if (descriptionLength > PROFILE_DESCRIPTION_MAX_LENGTH) return "A descrição deve ter até 240 caracteres.";
   if (!["public", "private"].includes(visibility)) return "Escolha se o perfil será público ou privado.";
-  if (!["public", "protected"].includes(letterVisibility)) return "Escolha se as cartinhas serão abertas ou protegidas.";
+  if (!["public", "protected"].includes(letterVisibility)) return "Escolha se os recados serão abertos ou protegidos.";
+  if (letterVisibility === "protected") {
+    const passwordLength = Array.from(String(profilePassword)).length;
+    if (passwordLength < PROFILE_PASSWORD_MIN_LENGTH || passwordLength > PROFILE_PASSWORD_MAX_LENGTH) return "Crie uma senha de 12 a 128 caracteres para proteger os recados.";
+    if (profilePassword !== profilePasswordConfirmation) return "A confirmação da senha não corresponde à senha criada.";
+  }
   if (ducksUrl) {
     try {
       const url = new URL(ducksUrl);

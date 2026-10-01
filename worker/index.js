@@ -242,6 +242,7 @@ async function createProfile(request, env) {
   let avatarBytes = null;
   try { avatarBytes = decodeAndValidateAvatar(validation.value.avatar); }
   catch { return fail("A foto enviada não corresponde a um JPEG, PNG ou WebP válido.", 422, request, env, "invalid_avatar"); }
+  const letterPasswordHash = validation.value.password ? await hashPassword(validation.value.password) : null;
 
   const id = crypto.randomUUID();
   const slug = `${slugifyProfileName(validation.value.displayName)}-${randomToken(9).toLowerCase().replace(/_/g, "-")}`;
@@ -255,13 +256,13 @@ async function createProfile(request, env) {
       `).bind(recipientSlug, validation.value.displayName, accent),
       env.DB.prepare(`
         INSERT INTO profiles (
-          id, recipient_id, slug, display_name, description, ducks_url, visibility, letter_visibility, avatar_media_type,
+          id, recipient_id, slug, display_name, description, ducks_url, visibility, letter_visibility, letter_password_hash, avatar_media_type,
           avatar_blob, idempotency_key, request_hash
         )
-        SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM recipients WHERE slug = ?
+        SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM recipients WHERE slug = ?
       `).bind(
         id, slug, validation.value.displayName, validation.value.description, validation.value.ducksUrl,
-        validation.value.visibility, validation.value.letterVisibility, validation.value.avatar?.mediaType ?? null,
+        validation.value.visibility, validation.value.letterVisibility, letterPasswordHash, validation.value.avatar?.mediaType ?? null,
         avatarBuffer, idempotencyKey, requestHash, recipientSlug
       )
     ]);
@@ -278,7 +279,7 @@ async function listProfileLetters(request, env, url, slug) {
   if (!profile) return fail("Perfil não encontrado.", 404, request, env, "profile_not_found");
   if (profile.letter_visibility === "protected") {
     const accessToken = request.headers.get("x-profile-access-token")?.trim() ?? "";
-    if (!accessToken) return fail("Digite a senha deste perfil para ver as cartinhas.", 401, request, env, "profile_locked");
+    if (!accessToken) return fail("Digite a senha deste perfil para ver os recados.", 401, request, env, "profile_locked");
     const tokenHash = await sha256(accessToken);
     const access = await env.DB.prepare(`
       SELECT token_hash FROM profile_access_tokens
@@ -330,7 +331,7 @@ async function unlockProfile(request, env, slug) {
 
 async function createProfileLetter(request, env, slug) {
   const rate = await enforceRateLimit(request, env, "create-profile-letter", 5, 600);
-  if (!rate.allowed) return json({ error: { code: "rate_limited", message: "Muitas cartinhas em pouco tempo. Tente novamente mais tarde." } }, 429, request, env, { "retry-after": String(rate.retryAfter) });
+  if (!rate.allowed) return json({ error: { code: "rate_limited", message: "Muitos recados em pouco tempo. Tente novamente mais tarde." } }, 429, request, env, { "retry-after": String(rate.retryAfter) });
   const profile = await getActiveProfile(env, slug);
   if (!profile) return fail("Perfil não encontrado.", 404, request, env, "profile_not_found");
   const validation = validateLetterInput({ ...(await readJson(request)), recipient: profile.recipient_slug });
@@ -340,7 +341,7 @@ async function createProfileLetter(request, env, slug) {
   const requestHash = await sha256(JSON.stringify({ profile: slug, body: validation.value.body }));
   const existing = await env.DB.prepare("SELECT id, request_hash FROM letters WHERE idempotency_key = ?").bind(idempotencyKey).first();
   if (existing) {
-    if (existing.request_hash !== requestHash) return fail("Essa chave já foi usada para outra cartinha.", 409, request, env, "idempotency_conflict");
+    if (existing.request_hash !== requestHash) return fail("Essa chave já foi usada para outro recado.", 409, request, env, "idempotency_conflict");
     return json({ id: existing.id, created: false }, 200, request, env);
   }
   const id = crypto.randomUUID();
@@ -358,7 +359,7 @@ async function createProfileLetter(request, env, slug) {
 
 async function createLetter(request, env) {
   const rate = await enforceRateLimit(request, env, "create-letter", 5, 600);
-  if (!rate.allowed) return json({ error: { code: "rate_limited", message: "Muitas cartinhas em pouco tempo. Tente novamente mais tarde." } }, 429, request, env, { "retry-after": String(rate.retryAfter) });
+  if (!rate.allowed) return json({ error: { code: "rate_limited", message: "Muitos recados em pouco tempo. Tente novamente mais tarde." } }, 429, request, env, { "retry-after": String(rate.retryAfter) });
   const validation = validateLetterInput(await readJson(request));
   if (!validation.ok) return fail(validation.error, 422, request, env, "validation_error");
   const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
@@ -368,7 +369,7 @@ async function createLetter(request, env) {
   const requestHash = await sha256(JSON.stringify(validation.value));
   const existing = await env.DB.prepare("SELECT id, request_hash FROM letters WHERE idempotency_key = ?").bind(idempotencyKey).first();
   if (existing) {
-    if (existing.request_hash !== requestHash) return fail("Essa chave já foi usada para outra cartinha.", 409, request, env, "idempotency_conflict");
+    if (existing.request_hash !== requestHash) return fail("Essa chave já foi usada para outro recado.", 409, request, env, "idempotency_conflict");
     return json({ id: existing.id, created: false }, 200, request, env);
   }
   const recipient = await env.DB.prepare(`
