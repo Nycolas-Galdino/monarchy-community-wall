@@ -28,12 +28,13 @@ export function createIdempotencyKey() {
   return `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
 }
 
-export function validateProfileDraft({ displayName, description, ducksUrl, visibility = "public", avatarFile }) {
+export function validateProfileDraft({ displayName, description, ducksUrl, visibility = "public", letterVisibility = "public", avatarFile }) {
   const nameLength = Array.from(normalizeDraft(displayName)).length;
   const descriptionLength = Array.from(normalizeDraft(description)).length;
   if (nameLength < 2 || nameLength > PROFILE_NAME_MAX_LENGTH) return "O nome do perfil deve ter entre 2 e 60 caracteres.";
   if (descriptionLength > PROFILE_DESCRIPTION_MAX_LENGTH) return "A descrição deve ter até 240 caracteres.";
   if (!["public", "private"].includes(visibility)) return "Escolha se o perfil será público ou privado.";
+  if (!["public", "protected"].includes(letterVisibility)) return "Escolha se as cartinhas serão abertas ou protegidas.";
   if (ducksUrl) {
     try {
       const url = new URL(ducksUrl);
@@ -47,6 +48,40 @@ export function validateProfileDraft({ displayName, description, ducksUrl, visib
     return "A foto original deve ser uma imagem de até 5 MB.";
   }
   return null;
+}
+
+export const PROFILE_ACCESS_STORAGE_KEY = "monarchy.profileAccess.v1";
+
+export function readProfileAccess(storage, slug, now = Date.now()) {
+  try {
+    const entries = JSON.parse(storage?.getItem(PROFILE_ACCESS_STORAGE_KEY) ?? "{}");
+    const entry = entries?.[slug];
+    if (!entry?.token || !entry?.expiresAt || Date.parse(entry.expiresAt) <= now) {
+      if (entry) {
+        delete entries[slug];
+        storage?.setItem(PROFILE_ACCESS_STORAGE_KEY, JSON.stringify(entries));
+      }
+      return null;
+    }
+    return entry.token;
+  } catch { return null; }
+}
+
+export function saveProfileAccess(storage, slug, token, expiresAt) {
+  try {
+    const entries = JSON.parse(storage?.getItem(PROFILE_ACCESS_STORAGE_KEY) ?? "{}");
+    entries[slug] = { token, expiresAt };
+    storage?.setItem(PROFILE_ACCESS_STORAGE_KEY, JSON.stringify(entries));
+    return true;
+  } catch { return false; }
+}
+
+export function removeProfileAccess(storage, slug) {
+  try {
+    const entries = JSON.parse(storage?.getItem(PROFILE_ACCESS_STORAGE_KEY) ?? "{}");
+    delete entries[slug];
+    storage?.setItem(PROFILE_ACCESS_STORAGE_KEY, JSON.stringify(entries));
+  } catch { /* Armazenamento indisponível: a sessão só não será persistida. */ }
 }
 
 export function buildProfileShareUrl(locationLike, slug) {

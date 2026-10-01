@@ -27,6 +27,9 @@ if (!index.includes('id="recipient-options"') || index.includes('<select id="rec
 if (!index.includes('name="visibility" value="public" checked') || !index.includes('name="visibility" value="private"')) {
   throw new Error("As opções pública e privada do perfil estão ausentes ou o padrão deixou de ser público.");
 }
+if (!index.includes('name="letterVisibility" value="public" checked') || !index.includes('name="letterVisibility" value="protected"') || !index.includes('id="profile-unlock-form"')) {
+  throw new Error("As opções de leitura e o desbloqueio persistente das cartinhas estão ausentes.");
+}
 if (!index.includes("https://app.duckapps.com.br/seu-perfil") || index.includes("https://duckpps.com/c/seu-perfil")) {
   throw new Error("O frontend precisa indicar somente o domínio Ducks permitido.");
 }

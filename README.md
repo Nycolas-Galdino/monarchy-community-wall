@@ -14,7 +14,7 @@ Cloudflare Worker (API e autorização)
 Cloudflare D1 / SQLite
 ```
 
-O Pages nunca recebe senha, hash de senha, segredo do Worker ou acesso direto ao banco. O token opaco recebido no login administrativo fica somente na memória da aba; o servidor guarda apenas o SHA-256 desse token e o invalida no logout, na expiração ou quando a conta é desativada.
+O Pages nunca recebe hash de senha, segredo do Worker ou acesso direto ao banco. O token opaco recebido no login administrativo fica somente na memória da aba. Para cartinhas protegidas, a senha digitada é enviada apenas para validação e nunca é salva pelo frontend; o navegador persiste, separadamente por perfil, somente uma chave opaca com validade configurável. O servidor guarda apenas hashes SHA-256 dos tokens e hashes PBKDF2 das senhas.
 
 ## O que está incluído
 
@@ -22,6 +22,7 @@ O Pages nunca recebe senha, hash de senha, segredo do Worker ou acesso direto ao
 - seletor visual de destinatários com Staff, Toda a comunidade e perfis ativos, incluindo a foto pública do perfil quando disponível;
 - perfis pessoais com link único no formato `?profile=nome-identificador`, compatível com GitHub Pages;
 - perfil público por padrão ou privado não listado; perfis privados continuam acessíveis e recebem cartinhas somente pelo link direto;
+- leitura das cartinhas aberta por padrão ou protegida por senha, independentemente de o perfil ser listado ou não;
 - nome obrigatório e descrição, link Ducks e foto opcionais; o servidor aceita somente URLs HTTPS no domínio `app.duckapps.com.br`;
 - foto redimensionada no navegador, limitada a 350 KB no backend e validada também pela assinatura real do arquivo;
 - mural pessoal isolado: suas cartinhas não aparecem no mural comunitário e perfis ocultos deixam de responder publicamente;
@@ -33,10 +34,11 @@ O Pages nunca recebe senha, hash de senha, segredo do Worker ou acesso direto ao
 - área de moderação fora da navegação pública, acessível por `moderacao.html` e ainda protegida por login;
 - histórico administrativo de perfis com data, status, quantidade de cartinhas e ações para copiar ou abrir cada link;
 - alteração auditada entre perfil público e privado diretamente no histórico administrativo, com controles responsivos para celular;
+- definição e redefinição de senha das cartinhas apenas pelo painel administrativo; o painel mostra somente se há senha, nunca seu conteúdo ou hash, e toda redefinição revoga acessos salvos;
 - várias contas de moderação, criação, desativação e encerramento das sessões desativadas;
 - senhas PBKDF2-SHA256 com salt aleatório e 100 mil iterações, o máximo aceito pelo runtime Workers;
 - sessões de até 8 horas, CORS por lista explícita, limites por origem e trilha de auditoria;
-- proteção de login contra enumeração por resposta genérica, verificação de senha equivalente e limite de 10 tentativas por 15 minutos;
+- proteção de login e desbloqueio de perfil contra força bruta, com limite de 10 tentativas por 15 minutos por origem pseudonimizada;
 - limites de 3 perfis por hora e 5 cartinhas por mural a cada 10 minutos por origem pseudonimizada;
 - dados do usuário sempre renderizados com `textContent`, sem interpretar HTML;
 - migrações SQL versionadas e testes de integração no runtime local do Cloudflare.
@@ -79,7 +81,7 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:8787/api/admin/bootstrap" 
 
 Depois disso, novos moderadores são criados no próprio painel.
 
-O acesso local da equipe é `http://localhost:8080/moderacao.html`. Em produção, acrescente `/moderacao.html` ao endereço publicado pelo GitHub Pages. O endereço não substitui autenticação: ele apenas deixa a entrada administrativa fora da navegação pública.
+O acesso local da equipe é `http://localhost:8080/moderacao.html`. Em produção, acrescente `/moderacao.html` ao endereço publicado pelo GitHub Pages. O endereço não substitui autenticação: ele apenas deixa a entrada administrativa fora da navegação pública. Na aba **Perfis**, a equipe pode alternar a leitura entre aberta/protegida e definir uma nova senha. A senha nunca volta à tela; use **Redefinir senha** quando necessário.
 
 ## Validação
 
@@ -93,7 +95,7 @@ npm run build
 
 ## Publicar o backend (Worker + D1)
 
-Os comandos abaixo apenas descrevem a publicação; nada foi implantado por esta implementação.
+Os mesmos comandos servem para novas instalações e para publicar migrações futuras.
 
 1. Autentique o Wrangler e crie o banco:
 
@@ -148,10 +150,13 @@ A URL da API não é segredo e aparece no `config.js` publicado. Credenciais e s
 | `SESSION_TTL_HOURS` | `wrangler.toml` | não | expiração da sessão administrativa |
 | `REPORT_AUTO_FLAG_THRESHOLD` | `wrangler.toml` | não | denúncias únicas para ocultação automática |
 | `DUCKS_ALLOWED_HOSTS` | `wrangler.toml` | não | hosts HTTPS aceitos no campo de perfil Ducks; atualmente `app.duckapps.com.br` |
+| `PROFILE_ACCESS_TTL_DAYS` | `wrangler.toml` | não | duração da chave local de leitura; padrão de 365 dias, máximo de 730 |
 
 O IP bruto não é gravado. O backend calcula um fingerprint SHA-256 combinado com `IP_HASH_SECRET`; fingerprints de reação e denúncia permanecem para impedir duplicidade, e registros expirados de rate limit são limpos durante novas requisições. Isso oferece pseudonimização, não anonimato criptográfico absoluto. Documente essa prática na política de privacidade da comunidade.
 
 Fotos de perfil são armazenadas como BLOB no D1. A pessoa que cria o perfil deve ter direito de uso da imagem e compreender que ela será pública. Nome e descrição são sempre tratados como texto simples; a interface não interpreta HTML fornecido por usuários.
+
+As senhas de perfil não são recuperáveis: somente podem ser substituídas pela moderação. A chave opaca de leitura fica em `localStorage` sob um mapa por slug, permitindo liberar mais de um perfil no mesmo navegador. Limpar os dados do site, trocar de navegador, expirar a chave ou redefinir a senha exige novo desbloqueio.
 
 ## Política de custo
 

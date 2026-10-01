@@ -5,9 +5,12 @@ import {
   buildProfileShareUrl,
   createIdempotencyKey,
   formatDate,
+  readProfileAccess,
+  removeProfileAccess,
+  saveProfileAccess,
   validateDraft,
   validateProfileDraft
-} from "./model.js?v=20260930-admin-visibility";
+} from "./model.js?v=20261001-profile-access";
 const config = window.MONARCHY_WALL_CONFIG ?? {};
 const api = new WallApi(config.apiBaseUrl || window.location.origin);
 const profileSlug = new URL(window.location.href).searchParams.get("profile")?.trim() ?? "";
@@ -16,7 +19,7 @@ let storyToolsPromise;
 const state = {
   recipients: [], letters: [], page: 1, hasMore: false, filter: "", moderator: null,
   adminTab: "letters", profile: null, profileSlug, profileKey: createIdempotencyKey(),
-  avatarPreviewUrl: null, storyUrl: null
+  profileAccessToken: null, avatarPreviewUrl: null, storyUrl: null
 };
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -138,6 +141,25 @@ function configureProfile(profile) {
   $("#fixed-recipient-name").textContent = profile.displayName;
   $("#recipient-filter-label").hidden = true;
   $("#wall-title").textContent = `Cartinhas para ${profile.displayName}`;
+  state.profileAccessToken = readProfileAccess(window.localStorage, profile.slug);
+}
+
+function showProfileLock() {
+  const configured = Boolean(state.profile?.passwordConfigured);
+  $("#profile-lock").hidden = false;
+  $("#letter-grid").hidden = true;
+  $("#load-more").hidden = true;
+  $("#profile-unlock-form").hidden = !configured;
+  $("#profile-password-pending").hidden = configured;
+  $("#profile-lock-copy").textContent = configured
+    ? "Digite a senha do perfil para abrir as cartinhas neste navegador."
+    : "As cartinhas estão reservadas, mas o acesso ainda precisa ser configurado pela Staff.";
+  $("#wall-status").textContent = "";
+}
+
+function showProfileLetters() {
+  $("#profile-lock").hidden = true;
+  $("#letter-grid").hidden = false;
 }
 
 function escapeHtml(value) {
@@ -177,17 +199,49 @@ function renderLetters() {
 async function loadPublic({ append = false } = {}) {
   const status = $("#wall-status");
   if (!append) status.textContent = "Abrindo as cartas…";
+  if (state.profile?.letterVisibility === "protected" && !state.profileAccessToken) {
+    state.letters = [];
+    showProfileLock();
+    return;
+  }
   try {
-    const data = state.profileSlug ? await api.profileLetters(state.profileSlug, state.page) : await api.letters({ page: state.page, recipient: state.filter });
+    const data = state.profileSlug ? await api.profileLetters(state.profileSlug, state.page, state.profileAccessToken) : await api.letters({ page: state.page, recipient: state.filter });
     if (data.profile && !state.profile) configureProfile(data.profile);
+    showProfileLetters();
     state.letters = append ? [...state.letters, ...data.letters] : data.letters;
     state.hasMore = data.hasMore;
     renderLetters();
     status.textContent = "";
   } catch (error) {
+    if (state.profileSlug && ["profile_locked", "profile_access_expired"].includes(error.code)) {
+      removeProfileAccess(window.localStorage, state.profileSlug);
+      state.profileAccessToken = null;
+      state.letters = [];
+      showProfileLock();
+      return;
+    }
     if (!append) { state.letters = []; renderLetters(); }
     status.textContent = state.profileSlug && error.status === 404 ? "Este mural não existe ou não está disponível." : `Não conseguimos abrir o mural: ${error.message}`;
   }
+}
+
+async function submitProfileUnlock(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = $("button[type=submit]", form);
+  const password = $("#profile-unlock-password").value;
+  setBusy(button, true, "Abrindo…");
+  setMessage($("#profile-unlock-message"), "Conferindo o acesso…");
+  try {
+    const data = await api.unlockProfile(state.profileSlug, password);
+    state.profileAccessToken = data.token;
+    saveProfileAccess(window.localStorage, state.profileSlug, data.token, data.expiresAt);
+    form.reset();
+    setMessage($("#profile-unlock-message"));
+    state.page = 1;
+    await loadPublic();
+  } catch (error) { setMessage($("#profile-unlock-message"), error.message, "error"); }
+  finally { setBusy(button, false); }
 }
 
 async function react(letterId, button) {
@@ -251,6 +305,7 @@ async function submitProfile(event) {
     description: form.description.value,
     ducksUrl: form.ducksUrl.value,
     visibility: form.visibility.value,
+    letterVisibility: form.letterVisibility.value,
     avatarFile: form.avatar.files[0] ?? null
   };
   const validationError = validateProfileDraft(values);
@@ -258,12 +313,16 @@ async function submitProfile(event) {
   const button = $("#create-profile-button"); setBusy(button, true, "Criando…"); setMessage($("#profile-message"), values.avatarFile ? "Otimizando a foto com segurança…" : "Preparando seu mural…");
   try {
     const avatar = values.avatarFile ? await (await loadStoryTools()).prepareAvatar(values.avatarFile) : null;
-    const data = await api.createProfile({ displayName: values.displayName, description: values.description, ducksUrl: values.ducksUrl, visibility: values.visibility, avatar }, state.profileKey);
+    const data = await api.createProfile({ displayName: values.displayName, description: values.description, ducksUrl: values.ducksUrl, visibility: values.visibility, letterVisibility: values.letterVisibility, avatar }, state.profileKey);
     const link = buildProfileShareUrl(window.location, data.slug);
     $("#generated-profile-link").value = link; $("#open-generated-link").href = link;
-    $("#profile-success-visibility").textContent = values.visibility === "private"
-      ? "Este mural é privado e não será listado na página inicial. Compartilhe o link com quem poderá escrever."
-      : "Este mural é público e aparecerá na lista inicial de destinatários.";
+    const discoveryCopy = values.visibility === "private"
+      ? "O mural não será listado na página inicial."
+      : "O mural aparecerá na lista inicial de destinatários.";
+    const readingCopy = values.letterVisibility === "protected"
+      ? " As cartinhas ficarão protegidas assim que a Staff definir uma senha no painel ADM."
+      : " As cartinhas terão leitura aberta.";
+    $("#profile-success-visibility").textContent = `${discoveryCopy}${readingCopy}`;
     state.profileKey = createIdempotencyKey();
     form.reset(); $("#profile-description-counter").textContent = `0 / ${PROFILE_DESCRIPTION_MAX_LENGTH}`; updateProfilePreview(); updateAvatarPreview(null);
     await loadRecipients();
@@ -360,7 +419,7 @@ async function renderAdminProfiles() {
         const header = document.createElement("header"); const name = document.createElement("strong"); name.textContent = profile.display_name;
         const badge = document.createElement("span"); badge.className = `status-badge status-${profile.status}`; badge.textContent = profile.status; header.append(name, badge);
         const copy = document.createElement("p"); copy.textContent = profile.description || "Sem descrição.";
-        const stats = document.createElement("p"); stats.className = "form-message"; stats.textContent = `${profile.letter_count} cartinha(s) · ${profile.visibility === "private" ? "privado pelo link" : "público"} · criado em ${formatDate(profile.created_at)}${profile.ducks_url ? " · Ducks informado" : ""}`;
+        const stats = document.createElement("p"); stats.className = "form-message"; stats.textContent = `${profile.letter_count} cartinha(s) · ${profile.visibility === "private" ? "privado pelo link" : "público"} · cartinhas ${profile.letter_visibility === "protected" ? "protegidas" : "abertas"} · criado em ${formatDate(profile.created_at)}${profile.ducks_url ? " · Ducks informado" : ""}`;
         const visibilityControl = document.createElement("div"); visibilityControl.className = "admin-visibility-control";
         const visibilityLabel = document.createElement("strong"); visibilityLabel.textContent = "Visibilidade";
         const visibilityButtons = document.createElement("div"); visibilityButtons.className = "admin-visibility-buttons";
@@ -383,6 +442,43 @@ async function renderAdminProfiles() {
           visibilityButtons.append(visibilityButton);
         }
         visibilityControl.append(visibilityLabel, visibilityButtons);
+        const letterAccessControl = document.createElement("div"); letterAccessControl.className = "admin-visibility-control";
+        const letterAccessLabel = document.createElement("strong"); letterAccessLabel.textContent = "Leitura das cartinhas";
+        const letterAccessButtons = document.createElement("div"); letterAccessButtons.className = "admin-visibility-buttons";
+        for (const [letterVisibility, label] of [["public", "Aberta"], ["protected", "Protegida"]]) {
+          const accessButton = document.createElement("button");
+          accessButton.type = "button";
+          accessButton.className = "secondary-button";
+          accessButton.textContent = label;
+          accessButton.setAttribute("aria-pressed", String(profile.letter_visibility === letterVisibility));
+          accessButton.disabled = profile.letter_visibility === letterVisibility;
+          accessButton.addEventListener("click", async () => {
+            setBusy(accessButton, true, "Salvando…");
+            try { await api.setProfileLetterVisibility(profile.id, letterVisibility); await refresh(); }
+            catch (error) { adminError(error); }
+            finally { setBusy(accessButton, false); }
+          });
+          letterAccessButtons.append(accessButton);
+        }
+        letterAccessControl.append(letterAccessLabel, letterAccessButtons);
+        const passwordControl = document.createElement("div"); passwordControl.className = "admin-password-control";
+        const passwordInfo = document.createElement("p");
+        passwordInfo.textContent = profile.password_configured
+          ? "Senha definida. Ela não pode ser visualizada; redefini-la revoga todos os acessos salvos."
+          : "Nenhuma senha definida. Enquanto isso, ninguém consegue abrir as cartinhas protegidas.";
+        const passwordForm = document.createElement("form"); passwordForm.className = "admin-password-form";
+        const passwordInput = document.createElement("input"); passwordInput.type = "password"; passwordInput.minLength = 12; passwordInput.maxLength = 128; passwordInput.required = true; passwordInput.autocomplete = "off"; passwordInput.readOnly = true; passwordInput.placeholder = "Nova senha · mínimo 12 caracteres"; passwordInput.setAttribute("data-1p-ignore", "true"); passwordInput.setAttribute("data-lpignore", "true"); passwordInput.setAttribute("aria-label", `Nova senha das cartinhas de ${profile.display_name}`);
+        passwordInput.addEventListener("focus", () => { passwordInput.readOnly = false; passwordInput.value = ""; }, { once: true });
+        const passwordButton = document.createElement("button"); passwordButton.type = "submit"; passwordButton.className = "secondary-button"; passwordButton.textContent = profile.password_configured ? "Redefinir senha" : "Definir senha";
+        passwordForm.append(passwordInput, passwordButton);
+        passwordForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          setBusy(passwordButton, true, "Salvando…");
+          try { await api.setProfilePassword(profile.id, passwordInput.value); passwordInput.value = ""; await refresh(); }
+          catch (error) { adminError(error); }
+          finally { setBusy(passwordButton, false); }
+        });
+        passwordControl.append(passwordInfo, passwordForm);
         const profileLink = buildProfileShareUrl(window.location, profile.slug);
         const linkRow = document.createElement("div"); linkRow.className = "admin-profile-link";
         const linkInput = document.createElement("input"); linkInput.readOnly = true; linkInput.value = profileLink; linkInput.setAttribute("aria-label", `Link do mural de ${profile.display_name}`);
@@ -396,7 +492,7 @@ async function renderAdminProfiles() {
           button.addEventListener("click", async () => { setBusy(button, true, "Salvando…"); try { await api.moderateProfile(profile.id, status, "Ação da moderação"); await refresh(); } catch (error) { adminError(error); } });
           actions.append(button);
         }
-        card.append(header, copy, stats, visibilityControl, linkRow, actions); list.append(card);
+        card.append(header, copy, stats, visibilityControl, letterAccessControl, passwordControl, linkRow, actions); list.append(card);
       }
     } catch (error) { adminError(error); }
   }
@@ -467,10 +563,12 @@ function bindEvents() {
   $("#load-more").addEventListener("click", () => { state.page += 1; loadPublic({ append: true }); });
   $("#report-form").addEventListener("submit", submitReport);
   $("#profile-form").addEventListener("submit", submitProfile);
+  $("#profile-unlock-form").addEventListener("submit", submitProfileUnlock);
   $("#create-profile-button").addEventListener("click", () => $("#profile-form").requestSubmit());
   $("#profile-display-name").addEventListener("input", updateProfilePreview);
   $("#profile-description-input").addEventListener("input", (event) => { $("#profile-description-counter").textContent = `${Array.from(event.target.value).length} / ${PROFILE_DESCRIPTION_MAX_LENGTH}`; updateProfilePreview(); });
   $$("input[name=visibility]").forEach((input) => input.addEventListener("change", updateProfilePreview));
+  $$("input[name=letterVisibility]").forEach((input) => input.addEventListener("change", updateProfilePreview));
   $("#profile-avatar-input").addEventListener("change", (event) => updateAvatarPreview(event.target.files[0] ?? null));
   $("#copy-generated-link").addEventListener("click", (event) => copyText($("#generated-profile-link").value, event.currentTarget));
   $("[data-close-profile-success]").addEventListener("click", () => $("#profile-success-dialog").close());

@@ -11,6 +11,7 @@ export const REPORT_REASONS = new Set(["abuse", "privacy", "spam", "other"]);
 export const LETTER_STATUSES = new Set(["published", "hidden", "deleted"]);
 export const PROFILE_STATUSES = new Set(["active", "hidden", "deleted"]);
 export const PROFILE_VISIBILITIES = new Set(["public", "private"]);
+export const PROFILE_LETTER_VISIBILITIES = new Set(["public", "protected"]);
 export const AVATAR_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function normalizePlainText(value) {
@@ -93,6 +94,7 @@ export function validateProfileInput(input, configuredHosts) {
   const displayName = normalizePlainText(input?.displayName);
   const description = normalizePlainText(input?.description);
   const visibility = String(input?.visibility ?? "public").trim().toLowerCase();
+  const letterVisibility = String(input?.letterVisibility ?? "public").trim().toLowerCase();
   const ducksUrl = validateDucksUrl(input?.ducksUrl, configuredHosts);
   if (textLength(displayName) < 2 || textLength(displayName) > PROFILE_NAME_MAX_LENGTH) {
     return { ok: false, error: "O nome do perfil deve ter entre 2 e 60 caracteres." };
@@ -104,6 +106,9 @@ export function validateProfileInput(input, configuredHosts) {
   if (!PROFILE_VISIBILITIES.has(visibility)) {
     return { ok: false, error: "Escolha se o perfil será público ou privado." };
   }
+  if (!PROFILE_LETTER_VISIBILITIES.has(letterVisibility)) {
+    return { ok: false, error: "Escolha se as cartinhas serão abertas ou protegidas." };
+  }
   const avatar = input?.avatar ?? null;
   if (avatar !== null) {
     if (!AVATAR_MEDIA_TYPES.has(avatar?.mediaType) || typeof avatar?.data !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(avatar.data)) {
@@ -113,7 +118,7 @@ export function validateProfileInput(input, configuredHosts) {
       return { ok: false, error: "A foto deve ter no máximo 350 KB após otimização." };
     }
   }
-  return { ok: true, value: { displayName, description: description || null, ducksUrl: ducksUrl.value, visibility, avatar } };
+  return { ok: true, value: { displayName, description: description || null, ducksUrl: ducksUrl.value, visibility, letterVisibility, avatar } };
 }
 
 export function decodeAndValidateAvatar(avatar) {
@@ -145,6 +150,23 @@ export function validateProfileVisibilityInput(input) {
     return { ok: false, error: "A visibilidade deve ser pública ou privada." };
   }
   return { ok: true, value: { visibility } };
+}
+
+export function validateProfileLetterVisibilityInput(input) {
+  const letterVisibility = String(input?.letterVisibility ?? "").trim().toLowerCase();
+  if (!PROFILE_LETTER_VISIBILITIES.has(letterVisibility)) {
+    return { ok: false, error: "A leitura das cartinhas deve ser aberta ou protegida." };
+  }
+  return { ok: true, value: { letterVisibility } };
+}
+
+export function validateProfilePasswordInput(input) {
+  const password = String(input?.password ?? "");
+  const length = textLength(password);
+  if (length < PASSWORD_MIN_LENGTH || length > PASSWORD_MAX_LENGTH) {
+    return { ok: false, error: `A senha deve ter entre ${PASSWORD_MIN_LENGTH} e ${PASSWORD_MAX_LENGTH} caracteres.` };
+  }
+  return { ok: true, value: { password } };
 }
 
 export function parsePositiveInt(value, fallback, maximum) {

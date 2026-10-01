@@ -9,10 +9,20 @@ import {
   validateLetterInput,
   validateModeratorInput,
   validateProfileInput,
+  validateProfileLetterVisibilityInput,
+  validateProfilePasswordInput,
   validateProfileVisibilityInput,
   verifyPassword
 } from "../worker/domain.js";
-import { buildProfileShareUrl, validateDraft, validateProfileDraft, wrapStoryText } from "../public/model.js";
+import {
+  buildProfileShareUrl,
+  readProfileAccess,
+  removeProfileAccess,
+  saveProfileAccess,
+  validateDraft,
+  validateProfileDraft,
+  wrapStoryText
+} from "../public/model.js";
 import { WallApi } from "../public/api.js";
 
 describe("validation and security helpers", () => {
@@ -63,10 +73,17 @@ describe("validation and security helpers", () => {
     const defaultVisibility = validateProfileInput({ displayName: "Lila", description: "Meu mural", ducksUrl: "https://app.duckapps.com.br/lila", avatar: png });
     expect(defaultVisibility.ok).toBe(true);
     expect(defaultVisibility.value.visibility).toBe("public");
+    expect(defaultVisibility.value.letterVisibility).toBe("public");
     expect(validateProfileInput({ displayName: "Lila", description: "Meu mural", visibility: "private" }).value.visibility).toBe("private");
+    expect(validateProfileInput({ displayName: "Lila", letterVisibility: "protected" }).value.letterVisibility).toBe("protected");
     expect(validateProfileInput({ displayName: "Lila", description: "Meu mural", visibility: "secret" }).ok).toBe(false);
+    expect(validateProfileInput({ displayName: "Lila", letterVisibility: "secret" }).ok).toBe(false);
     expect(validateProfileVisibilityInput({ visibility: "private" })).toEqual({ ok: true, value: { visibility: "private" } });
     expect(validateProfileVisibilityInput({ visibility: "secret" }).ok).toBe(false);
+    expect(validateProfileLetterVisibilityInput({ letterVisibility: "protected" })).toEqual({ ok: true, value: { letterVisibility: "protected" } });
+    expect(validateProfileLetterVisibilityInput({ letterVisibility: "secret" }).ok).toBe(false);
+    expect(validateProfilePasswordInput({ password: "senha-perfil-segura" }).ok).toBe(true);
+    expect(validateProfilePasswordInput({ password: "curta" }).ok).toBe(false);
     expect([...decodeAndValidateAvatar(png)].slice(0, 8)).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     expect(() => decodeAndValidateAvatar({ mediaType: "image/jpeg", data: png.data })).toThrow("invalid_avatar");
     expect(validateProfileInput({ displayName: "X", description: "" }).ok).toBe(false);
@@ -77,9 +94,25 @@ describe("validation and security helpers", () => {
     expect(wrapStoryText("uma cartinha curta e bonita", 12)).toEqual(["uma cartinha", "curta e", "bonita"]);
     expect(validateProfileDraft({ displayName: "Lila", description: "", ducksUrl: "https://app.duckapps.com.br/lila" })).toBeNull();
     expect(validateProfileDraft({ displayName: "Lila", description: "", visibility: "private" })).toBeNull();
+    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "protected" })).toBeNull();
     expect(validateProfileDraft({ displayName: "Lila", description: "", visibility: "secret" })).toMatch(/público ou privado/);
+    expect(validateProfileDraft({ displayName: "Lila", description: "", letterVisibility: "secret" })).toMatch(/abertas ou protegidas/);
     expect(validateProfileDraft({ displayName: "Lila", description: "", ducksUrl: "http://app.duckapps.com.br/lila" })).toMatch(/HTTPS/);
     expect(validateProfileDraft({ displayName: "Lila", description: "", ducksUrl: "https://duckpps.com/c/lila" })).toMatch(/app\.duckapps\.com\.br/);
+  });
+
+  it("stores opaque access tokens independently for multiple profiles and prunes expired entries", () => {
+    const values = new Map();
+    const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+    const future = "2030-01-01T00:00:00.000Z";
+    saveProfileAccess(storage, "lila", "token-lila", future);
+    saveProfileAccess(storage, "saito", "token-saito", future);
+    expect(readProfileAccess(storage, "lila", Date.parse("2029-01-01"))).toBe("token-lila");
+    expect(readProfileAccess(storage, "saito", Date.parse("2029-01-01"))).toBe("token-saito");
+    removeProfileAccess(storage, "lila");
+    expect(readProfileAccess(storage, "lila", Date.parse("2029-01-01"))).toBeNull();
+    expect(readProfileAccess(storage, "saito", Date.parse("2031-01-01"))).toBeNull();
+    expect(JSON.stringify([...values.values()])).not.toContain("senha");
   });
 
   it("stops waiting and reports a timeout when the API hangs", async () => {

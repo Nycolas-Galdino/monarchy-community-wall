@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600;6..72,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260930-admin-visibility">
+  <link rel="stylesheet" href="styles.css?v=20261001-profile-access">
 </head>
 <body>
   <a class="skip-link" href="#mural">Pular para as cartinhas</a>
@@ -74,6 +74,11 @@
             <label class="visibility-option"><input type="radio" name="visibility" value="public" checked><span><strong>Público</strong><small>Aparece na lista inicial para receber cartinhas.</small></span></label>
             <label class="visibility-option"><input type="radio" name="visibility" value="private"><span><strong>Privado · somente pelo link</strong><small>Não aparece na lista. Quem tiver o link poderá abrir e escrever.</small></span></label>
           </fieldset>
+          <fieldset class="profile-visibility-field">
+            <legend>Quem pode ler as cartinhas?</legend>
+            <label class="visibility-option"><input type="radio" name="letterVisibility" value="public" checked><span><strong>Leitura aberta</strong><small>Qualquer pessoa que abrir o perfil poderá ver as cartinhas.</small></span></label>
+            <label class="visibility-option"><input type="radio" name="letterVisibility" value="protected"><span><strong>Protegidas por senha</strong><small>A Staff definirá a senha no painel ADM. Ela nunca poderá consultá-la depois.</small></span></label>
+          </fieldset>
         </div>
         <div class="profile-preview" aria-live="polite">
           <div class="avatar-preview" id="avatar-preview"><span>✦</span></div>
@@ -119,6 +124,17 @@
         </label>
       </div>
       <div id="wall-status" class="wall-status" role="status" aria-live="polite">Abrindo as cartas…</div>
+      <div class="profile-lock" id="profile-lock" hidden>
+        <span class="profile-lock-mark" aria-hidden="true">✦</span>
+        <div><p class="eyebrow">um cantinho reservado</p><h3>Estas cartinhas são protegidas</h3><p id="profile-lock-copy">Digite a senha do perfil para abrir as cartinhas neste navegador.</p></div>
+        <form id="profile-unlock-form" class="profile-unlock-form">
+          <label for="profile-unlock-password">Senha do perfil</label>
+          <div><input id="profile-unlock-password" type="password" minlength="12" maxlength="128" autocomplete="current-password" required><button class="primary-button" type="submit">Abrir cartinhas</button></div>
+          <p class="form-message" id="profile-unlock-message" role="status" aria-live="polite"></p>
+        </form>
+        <p class="profile-password-pending" id="profile-password-pending" hidden>A senha ainda não foi definida. Peça à Staff para configurá-la na moderação.</p>
+        <p class="profile-lock-note">O navegador guarda somente uma chave de acesso deste perfil — nunca a senha. Você pode liberar vários perfis no mesmo aparelho.</p>
+      </div>
       <div class="letter-grid" id="letter-grid" aria-live="polite"></div>
       <div class="load-more-wrap"><button id="load-more" class="secondary-button" type="button" hidden>Ver mais cartinhas</button></div>
     </section>
@@ -198,6 +214,6 @@
   <noscript><p class="startup-error">Ative o JavaScript para abrir as cartinhas.</p></noscript>
   <script src="bootstrap.js"></script>
   <script src="config.js"></script>
-  <script type="module" src="app.js?v=20260930-admin-visibility"></script>
+  <script type="module" src="app.js?v=20261001-profile-access"></script>
 </body>
 </html>

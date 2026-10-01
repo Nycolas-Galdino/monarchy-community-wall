@@ -159,7 +159,64 @@ describe("community wall API", () => {
     expect((await (await request(`/profiles/${privateSlug}/letters`)).json()).letters[0].body).toContain("link privado");
     expect((await (await request("/letters")).json()).letters.some((item) => item.body.includes("link privado"))).toBe(false);
 
+    const protectedCreated = await request("/profiles", {
+      method: "POST",
+      headers: { "idempotency-key": "test_protected_profile_123456", "cf-connecting-ip": "192.0.2.80" },
+      body: { displayName: "Mural Protegido", letterVisibility: "protected" }
+    });
+    expect(protectedCreated.status).toBe(201);
+    const protectedSlug = (await protectedCreated.json()).slug;
+    const protectedMetadata = (await (await request(`/profiles/${protectedSlug}`)).json()).profile;
+    expect(protectedMetadata).toMatchObject({ letterVisibility: "protected", passwordConfigured: false });
+    expect(protectedMetadata).not.toHaveProperty("letter_password_hash");
+    const protectedLetter = await request(`/profiles/${protectedSlug}/letters`, {
+      method: "POST",
+      headers: { "idempotency-key": "protected_letter_key_123456", "cf-connecting-ip": "192.0.2.81" },
+      body: { body: "Esta cartinha exige o acesso do perfil para leitura." }
+    });
+    expect(protectedLetter.status).toBe(201);
+    expect((await request(`/profiles/${protectedSlug}/letters`)).status).toBe(401);
+
     const profilesAdmin = await request("/admin/profiles", { token });
+    const protectedAdmin = (await profilesAdmin.clone().json()).profiles.find((item) => item.slug === protectedSlug);
+    expect(protectedAdmin).toMatchObject({ letter_visibility: "protected", password_configured: 0 });
+    expect(protectedAdmin).not.toHaveProperty("letter_password_hash");
+    expect(protectedAdmin).not.toHaveProperty("password");
+    expect((await request(`/admin/profiles/${protectedAdmin.id}/letter-password`, { method: "PUT", token, body: { password: "curta" } })).status).toBe(422);
+    const passwordSet = await request(`/admin/profiles/${protectedAdmin.id}/letter-password`, { method: "PUT", token, body: { password: "senha-inicial-do-perfil" } });
+    expect(passwordSet.status).toBe(200);
+    expect(await passwordSet.json()).toEqual({ updated: true, letterVisibility: "protected", passwordConfigured: true });
+    const protectedAfterPassword = (await (await request(`/profiles/${protectedSlug}`)).json()).profile;
+    expect(protectedAfterPassword.passwordConfigured).toBe(true);
+    expect(protectedAfterPassword).not.toHaveProperty("letterPasswordHash");
+    const wrongUnlock = await request(`/profiles/${protectedSlug}/unlock`, { method: "POST", headers: { "cf-connecting-ip": "192.0.2.82" }, body: { password: "senha-totalmente-errada" } });
+    expect(wrongUnlock.status).toBe(401);
+    const unlock = await request(`/profiles/${protectedSlug}/unlock`, { method: "POST", headers: { "cf-connecting-ip": "192.0.2.83" }, body: { password: "senha-inicial-do-perfil" } });
+    expect(unlock.status).toBe(200);
+    const access = await unlock.json();
+    expect(access.token.length).toBeGreaterThan(30);
+    const unlockedLetters = await request(`/profiles/${protectedSlug}/letters`, { headers: { "x-profile-access-token": access.token } });
+    expect(unlockedLetters.status).toBe(200);
+    expect((await unlockedLetters.json()).letters[0].body).toContain("exige o acesso");
+    const passwordReset = await request(`/admin/profiles/${protectedAdmin.id}/letter-password`, { method: "PUT", token, body: { password: "senha-nova-do-perfil" } });
+    expect(passwordReset.status).toBe(200);
+    expect((await request(`/profiles/${protectedSlug}/letters`, { headers: { "x-profile-access-token": access.token } })).status).toBe(401);
+    expect((await request(`/profiles/${protectedSlug}/unlock`, { method: "POST", headers: { "cf-connecting-ip": "192.0.2.84" }, body: { password: "senha-inicial-do-perfil" } })).status).toBe(401);
+    const newUnlock = await request(`/profiles/${protectedSlug}/unlock`, { method: "POST", headers: { "cf-connecting-ip": "192.0.2.85" }, body: { password: "senha-nova-do-perfil" } });
+    expect(newUnlock.status).toBe(200);
+    const openLetters = await request(`/admin/profiles/${protectedAdmin.id}/letter-visibility`, { method: "PATCH", token, body: { letterVisibility: "public" } });
+    expect(openLetters.status).toBe(200);
+    expect((await request(`/profiles/${protectedSlug}/letters`)).status).toBe(200);
+    expect((await request(`/admin/profiles/${protectedAdmin.id}/letter-visibility`, { method: "PATCH", body: { letterVisibility: "protected" } })).status).toBe(401);
+    expect((await request(`/admin/profiles/${protectedAdmin.id}/letter-visibility`, { method: "PATCH", token, body: { letterVisibility: "secret" } })).status).toBe(422);
+    expect((await request(`/admin/profiles/${protectedAdmin.id}/letter-visibility`, { method: "PATCH", token, body: { letterVisibility: "protected" } })).status).toBe(200);
+    let profileRateLimited;
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      profileRateLimited = await request(`/profiles/${protectedSlug}/unlock`, { method: "POST", headers: { "cf-connecting-ip": "192.0.2.86" }, body: { password: "senha-incorreta-longa" } });
+    }
+    expect(profileRateLimited.status).toBe(429);
+    expect(profileRateLimited.headers.get("retry-after")).toMatch(/^\d+$/);
+
     const adminProfile = (await profilesAdmin.json()).profiles.find((item) => item.slug === profileSlug);
     expect(adminProfile.letter_count).toBe(1);
     expect(adminProfile.visibility).toBe("public");
@@ -198,6 +255,10 @@ describe("community wall API", () => {
     expect((await audit.json()).entries.some((entry) => entry.action === "letter.moderate")).toBe(true);
     expect((await request("/admin/audit", { token }).then((response) => response.json())).entries.some((entry) => entry.action === "profile.moderate")).toBe(true);
     expect((await request("/admin/audit", { token }).then((response) => response.json())).entries.some((entry) => entry.action === "profile.visibility")).toBe(true);
+    expect((await request("/admin/audit", { token }).then((response) => response.json())).entries.some((entry) => entry.action === "profile.letter_visibility")).toBe(true);
+    const auditEntries = (await (await request("/admin/audit", { token })).json()).entries;
+    expect(auditEntries.some((entry) => entry.action === "profile.password_reset")).toBe(true);
+    expect(JSON.stringify(auditEntries)).not.toContain("senha-inicial-do-perfil");
   });
 
   it("rejects disallowed CORS preflights and invalid content", async () => {

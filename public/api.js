@@ -52,7 +52,11 @@ export class WallApi {
     return this.request("/letters", { method: "POST", headers: { "idempotency-key": idempotencyKey }, body: JSON.stringify(payload) });
   }
   profile(slug) { return this.request(`/profiles/${encodeURIComponent(slug)}`, { cache: "no-store" }); }
-  profileLetters(slug, page = 1) { return this.request(`/profiles/${encodeURIComponent(slug)}/letters?page=${page}&limit=24`, { cache: "no-store" }); }
+  profileLetters(slug, page = 1, accessToken = null) {
+    const headers = accessToken ? { "x-profile-access-token": accessToken } : {};
+    return this.request(`/profiles/${encodeURIComponent(slug)}/letters?page=${page}&limit=24`, { cache: "no-store", headers });
+  }
+  unlockProfile(slug, password) { return this.request(`/profiles/${encodeURIComponent(slug)}/unlock`, { method: "POST", body: JSON.stringify({ password }) }); }
   createProfile(payload, idempotencyKey) { return this.request("/profiles", { method: "POST", headers: { "idempotency-key": idempotencyKey }, body: JSON.stringify(payload) }); }
   createProfileLetter(slug, body, idempotencyKey) { return this.request(`/profiles/${encodeURIComponent(slug)}/letters`, { method: "POST", headers: { "idempotency-key": idempotencyKey }, body: JSON.stringify({ body }) }); }
   profileAvatarUrl(slug) { return this.assetUrl(`/profiles/${encodeURIComponent(slug)}/avatar`); }
@@ -65,6 +69,8 @@ export class WallApi {
   adminProfiles(status = "all") { return this.request(`/admin/profiles?status=${encodeURIComponent(status)}`); }
   moderateProfile(profileId, status, note) { return this.request(`/admin/profiles/${profileId}`, { method: "PATCH", body: JSON.stringify({ status, note }) }); }
   setProfileVisibility(profileId, visibility) { return this.request(`/admin/profiles/${profileId}/visibility`, { method: "PATCH", body: JSON.stringify({ visibility }) }); }
+  setProfileLetterVisibility(profileId, letterVisibility) { return this.request(`/admin/profiles/${profileId}/letter-visibility`, { method: "PATCH", body: JSON.stringify({ letterVisibility }) }); }
+  setProfilePassword(profileId, password) { return this.request(`/admin/profiles/${profileId}/letter-password`, { method: "PUT", body: JSON.stringify({ password }) }); }
   moderators() { return this.request("/admin/moderators"); }
   createModerator(payload) { return this.request("/admin/moderators", { method: "POST", body: JSON.stringify(payload) }); }
   setModeratorActive(id, active) { return this.request(`/admin/moderators/${id}`, { method: "PATCH", body: JSON.stringify({ active }) }); }

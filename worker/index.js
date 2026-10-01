@@ -13,7 +13,9 @@ import {
   validateModerationInput,
   validateModeratorInput,
   validateProfileInput,
+  validateProfileLetterVisibilityInput,
   validateProfileModerationInput,
+  validateProfilePasswordInput,
   validateProfileVisibilityInput,
   slugifyProfileName,
   verifyPassword
@@ -182,6 +184,8 @@ function profileJson(row) {
     description: row.description,
     ducksUrl: row.ducks_url,
     visibility: row.visibility,
+    letterVisibility: row.letter_visibility,
+    passwordConfigured: Boolean(row.letter_password_hash),
     hasAvatar: Boolean(row.avatar_media_type),
     createdAt: row.created_at
   };
@@ -189,7 +193,8 @@ function profileJson(row) {
 
 async function getActiveProfile(env, slug) {
   return env.DB.prepare(`
-    SELECT p.id, p.slug, p.display_name, p.description, p.ducks_url, p.visibility, p.avatar_media_type,
+    SELECT p.id, p.slug, p.display_name, p.description, p.ducks_url, p.visibility,
+           p.letter_visibility, p.letter_password_hash, p.avatar_media_type,
            p.created_at, p.recipient_id, r.slug AS recipient_slug
     FROM profiles p JOIN recipients r ON r.id = p.recipient_id
     WHERE p.slug = ? AND p.status = 'active'
@@ -199,7 +204,7 @@ async function getActiveProfile(env, slug) {
 async function getProfile(request, env, slug) {
   const profile = await getActiveProfile(env, slug);
   if (!profile) return fail("Perfil não encontrado.", 404, request, env, "profile_not_found");
-  return json({ profile: profileJson(profile) }, 200, request, env, { "cache-control": "public, max-age=60" });
+  return json({ profile: profileJson(profile) }, 200, request, env, { "cache-control": "no-store" });
 }
 
 async function getProfileAvatar(request, env, slug) {
@@ -250,13 +255,14 @@ async function createProfile(request, env) {
       `).bind(recipientSlug, validation.value.displayName, accent),
       env.DB.prepare(`
         INSERT INTO profiles (
-          id, recipient_id, slug, display_name, description, ducks_url, visibility, avatar_media_type,
+          id, recipient_id, slug, display_name, description, ducks_url, visibility, letter_visibility, avatar_media_type,
           avatar_blob, idempotency_key, request_hash
         )
-        SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM recipients WHERE slug = ?
+        SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM recipients WHERE slug = ?
       `).bind(
         id, slug, validation.value.displayName, validation.value.description, validation.value.ducksUrl,
-        validation.value.visibility, validation.value.avatar?.mediaType ?? null, avatarBuffer, idempotencyKey, requestHash, recipientSlug
+        validation.value.visibility, validation.value.letterVisibility, validation.value.avatar?.mediaType ?? null,
+        avatarBuffer, idempotencyKey, requestHash, recipientSlug
       )
     ]);
   } catch (error) {
@@ -270,6 +276,16 @@ async function createProfile(request, env) {
 async function listProfileLetters(request, env, url, slug) {
   const profile = await getActiveProfile(env, slug);
   if (!profile) return fail("Perfil não encontrado.", 404, request, env, "profile_not_found");
+  if (profile.letter_visibility === "protected") {
+    const accessToken = request.headers.get("x-profile-access-token")?.trim() ?? "";
+    if (!accessToken) return fail("Digite a senha deste perfil para ver as cartinhas.", 401, request, env, "profile_locked");
+    const tokenHash = await sha256(accessToken);
+    const access = await env.DB.prepare(`
+      SELECT token_hash FROM profile_access_tokens
+      WHERE token_hash = ? AND profile_id = ? AND expires_at > ?
+    `).bind(tokenHash, profile.id, new Date().toISOString()).first();
+    if (!access) return fail("O acesso salvo expirou. Digite a senha novamente.", 401, request, env, "profile_access_expired");
+  }
   const limit = parsePositiveInt(url.searchParams.get("limit"), 24, 50);
   const page = parsePositiveInt(url.searchParams.get("page"), 1, 1000);
   const offset = (page - 1) * limit;
@@ -281,7 +297,35 @@ async function listProfileLetters(request, env, url, slug) {
     ORDER BY l.created_at DESC, l.id DESC LIMIT ? OFFSET ?
   `).bind(profile.recipient_id, limit + 1, offset).all();
   const rows = result.results ?? [];
-  return json({ profile: profileJson(profile), letters: rows.slice(0, limit).map(publicLetter), page, hasMore: rows.length > limit }, 200, request, env, { "cache-control": "public, max-age=15" });
+  const cacheControl = profile.letter_visibility === "public" ? "public, max-age=15" : "no-store";
+  return json({ profile: profileJson(profile), letters: rows.slice(0, limit).map(publicLetter), page, hasMore: rows.length > limit }, 200, request, env, { "cache-control": cacheControl });
+}
+
+async function unlockProfile(request, env, slug) {
+  // Uma chave de rota fixa evita que slugs inventados criem buckets ilimitados no D1.
+  const rate = await enforceRateLimit(request, env, "profile-unlock", 10, 900);
+  if (!rate.allowed) return json({ error: { code: "rate_limited", message: "Muitas tentativas. Aguarde um pouco antes de tentar novamente." } }, 429, request, env, { "retry-after": String(rate.retryAfter) });
+  const validation = validateProfilePasswordInput(await readJson(request));
+  if (!validation.ok) return fail(validation.error, 422, request, env, "validation_error");
+  const profile = await getActiveProfile(env, slug);
+  if (!profile) return fail("Perfil não encontrado.", 404, request, env, "profile_not_found");
+  if (profile.letter_visibility !== "protected") return fail("Este perfil não exige senha.", 409, request, env, "profile_not_protected");
+  if (!profile.letter_password_hash) return fail("A Staff ainda não definiu a senha deste perfil.", 409, request, env, "profile_password_unconfigured");
+  if (!(await verifyPassword(validation.value.password, profile.letter_password_hash))) {
+    return fail("Senha incorreta.", 401, request, env, "invalid_profile_password");
+  }
+  const token = randomToken(32);
+  const tokenHash = await sha256(token);
+  const configuredDays = Number.parseInt(env.PROFILE_ACCESS_TTL_DAYS ?? "365", 10);
+  const ttlDays = Number.isFinite(configuredDays) ? Math.min(Math.max(configuredDays, 1), 730) : 365;
+  const expiresAt = new Date(Date.now() + ttlDays * 86_400_000).toISOString();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM profile_access_tokens WHERE expires_at <= ?").bind(new Date().toISOString()),
+    env.DB.prepare(`
+      INSERT INTO profile_access_tokens (token_hash, profile_id, expires_at) VALUES (?, ?, ?)
+    `).bind(tokenHash, profile.id, expiresAt)
+  ]);
+  return json({ token, expiresAt }, 200, request, env);
 }
 
 async function createProfileLetter(request, env, slug) {
@@ -507,7 +551,8 @@ async function listAdminProfiles(request, env, url) {
     bindings.push(status);
   }
   const result = await env.DB.prepare(`
-    SELECT p.id, p.slug, p.display_name, p.description, p.ducks_url, p.visibility, p.avatar_media_type,
+    SELECT p.id, p.slug, p.display_name, p.description, p.ducks_url, p.visibility, p.letter_visibility,
+           CASE WHEN p.letter_password_hash IS NULL THEN 0 ELSE 1 END AS password_configured, p.avatar_media_type,
            p.status, p.created_at, p.moderated_at, p.moderation_note,
            COUNT(l.id) AS letter_count, m.display_name AS moderated_by_name
     FROM profiles p
@@ -544,6 +589,37 @@ async function setProfileVisibility(request, env, profileId, moderator) {
     INSERT INTO audit_log (moderator_id, action, target_type, target_id, details) VALUES (?, 'profile.visibility', 'profile', ?, ?)
   `).bind(moderator.id, profileId, JSON.stringify(validation.value)).run();
   return json({ updated: true, visibility: validation.value.visibility }, 200, request, env);
+}
+
+async function setProfileLetterVisibility(request, env, profileId, moderator) {
+  const validation = validateProfileLetterVisibilityInput(await readJson(request));
+  if (!validation.ok) return fail(validation.error, 422, request, env, "validation_error");
+  const result = await env.DB.prepare(
+    "UPDATE profiles SET letter_visibility = ? WHERE id = ?"
+  ).bind(validation.value.letterVisibility, profileId).run();
+  if (!result.meta?.changes) return fail("Perfil não encontrado.", 404, request, env, "not_found");
+  await env.DB.prepare(`
+    INSERT INTO audit_log (moderator_id, action, target_type, target_id, details)
+    VALUES (?, 'profile.letter_visibility', 'profile', ?, ?)
+  `).bind(moderator.id, profileId, JSON.stringify(validation.value)).run();
+  return json({ updated: true, letterVisibility: validation.value.letterVisibility }, 200, request, env);
+}
+
+async function setProfilePassword(request, env, profileId, moderator) {
+  const validation = validateProfilePasswordInput(await readJson(request));
+  if (!validation.ok) return fail(validation.error, 422, request, env, "validation_error");
+  const profile = await env.DB.prepare("SELECT id FROM profiles WHERE id = ?").bind(profileId).first();
+  if (!profile) return fail("Perfil não encontrado.", 404, request, env, "not_found");
+  const passwordHash = await hashPassword(validation.value.password);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE profiles SET letter_password_hash = ?, letter_visibility = 'protected' WHERE id = ?").bind(passwordHash, profileId),
+    env.DB.prepare("DELETE FROM profile_access_tokens WHERE profile_id = ?").bind(profileId),
+    env.DB.prepare(`
+      INSERT INTO audit_log (moderator_id, action, target_type, target_id, details)
+      VALUES (?, 'profile.password_reset', 'profile', ?, ?)
+    `).bind(moderator.id, profileId, JSON.stringify({ passwordConfigured: true, tokensRevoked: true }))
+  ]);
+  return json({ updated: true, letterVisibility: "protected", passwordConfigured: true }, 200, request, env);
 }
 
 async function listModerators(request, env) {
@@ -585,8 +661,8 @@ async function route(request, env) {
     return new Response(null, { status: 204, headers: {
       ...securityHeaders(origin, env),
       "access-control-allow-origin": origin,
-      "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
-      "access-control-allow-headers": "Authorization, Content-Type, Idempotency-Key, X-Bootstrap-Token",
+      "access-control-allow-methods": "GET, POST, PUT, PATCH, OPTIONS",
+      "access-control-allow-headers": "Authorization, Content-Type, Idempotency-Key, X-Bootstrap-Token, X-Profile-Access-Token",
       "access-control-max-age": "86400"
     } });
   }
@@ -598,6 +674,8 @@ async function route(request, env) {
   const profileLettersMatch = path.match(/^\/profiles\/([a-z0-9-]{3,80})\/letters$/);
   if (request.method === "GET" && profileLettersMatch) return listProfileLetters(request, env, url, profileLettersMatch[1]);
   if (request.method === "POST" && profileLettersMatch) return createProfileLetter(request, env, profileLettersMatch[1]);
+  const profileUnlockMatch = path.match(/^\/profiles\/([a-z0-9-]{3,80})\/unlock$/);
+  if (request.method === "POST" && profileUnlockMatch) return unlockProfile(request, env, profileUnlockMatch[1]);
   const profileMatch = path.match(/^\/profiles\/([a-z0-9-]{3,80})$/);
   if (request.method === "GET" && profileMatch) return getProfile(request, env, profileMatch[1]);
   if (request.method === "GET" && path === "/letters") return listPublicLetters(request, env, url);
@@ -621,6 +699,10 @@ async function route(request, env) {
     if (request.method === "GET" && path === "/admin/profiles") return listAdminProfiles(request, env, url);
     const profileVisibilityMatch = path.match(/^\/admin\/profiles\/([0-9a-f-]+)\/visibility$/i);
     if (request.method === "PATCH" && profileVisibilityMatch) return setProfileVisibility(request, env, profileVisibilityMatch[1], moderator);
+    const profileLetterVisibilityMatch = path.match(/^\/admin\/profiles\/([0-9a-f-]+)\/letter-visibility$/i);
+    if (request.method === "PATCH" && profileLetterVisibilityMatch) return setProfileLetterVisibility(request, env, profileLetterVisibilityMatch[1], moderator);
+    const profilePasswordMatch = path.match(/^\/admin\/profiles\/([0-9a-f-]+)\/letter-password$/i);
+    if (request.method === "PUT" && profilePasswordMatch) return setProfilePassword(request, env, profilePasswordMatch[1], moderator);
     const adminProfileMatch = path.match(/^\/admin\/profiles\/([0-9a-f-]+)$/i);
     if (request.method === "PATCH" && adminProfileMatch) return moderateProfile(request, env, adminProfileMatch[1], moderator);
     if (request.method === "GET" && path === "/admin/moderators") return listModerators(request, env);
