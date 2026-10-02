@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600;6..72,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261001-anonymous-wall">
+  <link rel="stylesheet" href="styles.css?v=20261002-ducks-print">
 </head>
 <body>
   <a class="skip-link" href="#mural">Pular para os recados</a>
@@ -150,7 +150,10 @@
     </section>
   </main>
 
-  <footer><p>Feito para aproximar, não para expor. <span aria-hidden="true">✦</span></p></footer>
+  <footer>
+    <p>Feito para aproximar, não para expor. <span aria-hidden="true">✦</span></p>
+    <p class="browser-recommendation"><strong>Melhor experiência:</strong> abra esta página em um navegador externo. O navegador interno do Ducks pode impedir o download de imagens. <span aria-hidden="true">↗</span></p>
+  </footer>
 
   <dialog id="report-dialog" class="dialog">
     <form method="dialog" id="report-form">
@@ -167,11 +170,17 @@
 
   <dialog id="story-dialog" class="dialog story-dialog">
     <button class="dialog-close" type="button" data-close-story aria-label="Fechar">×</button>
-    <p class="eyebrow">pronto para os stories</p><h2>Seu recado em PNG</h2>
-    <p class="dialog-copy">Formato vertical 1080 × 1920, gerado somente no seu navegador.</p>
+    <div class="story-dialog-copy">
+      <p class="eyebrow">pronto para o print 📸</p><h2>Capture o babado</h2>
+      <p class="dialog-copy">A arte vertical 1080 × 1920 é gerada somente no seu navegador.</p>
+    </div>
     <div class="story-preview-wrap" id="story-preview-wrap"><span>Gerando a arte…</span></div>
     <p class="form-message" id="story-message" role="status"></p>
-    <a id="download-story" class="primary-button" download="recado-monarchy.png" hidden>Baixar PNG</a>
+    <div class="story-actions">
+      <button id="story-print-mode" class="primary-button" type="button" hidden>Abrir tela para print</button>
+      <p class="ducks-download-note"><strong>Está no navegador do Ducks?</strong> Por uma limitação dele, não é possível baixar esta imagem por ali. Faça um print da tela ou toque em <strong>Abrir em outro navegador</strong> — o botão com o ícone <span aria-hidden="true">↗</span> na área externa do Ducks — e tente o download no navegador externo.</p>
+      <a id="download-story" class="secondary-button" download="recado-monarchy.png" hidden>Baixar imagem em PNG</a>
+    </div>
   </dialog>
 
   <dialog id="profile-success-dialog" class="dialog profile-created-dialog">
@@ -217,13 +226,13 @@
     <article class="letter-card">
       <div class="letter-top"><span class="recipient-pill"></span><button class="icon-button report-button" title="Denunciar recado" aria-label="Denunciar recado">•••</button></div>
       <p class="letter-body"></p>
-      <div class="letter-bottom"><time></time><div class="letter-actions"><button class="story-button" type="button" aria-label="Criar imagem para story">Story ↗</button><button class="reaction-button" type="button" aria-label="Marcar como interessante"><span aria-hidden="true">✦</span> <b>0</b></button></div></div>
+      <div class="letter-bottom"><time></time><div class="letter-actions"><button class="story-button" type="button" aria-label="Preparar imagem para print ou story">Print / Story ↗</button><button class="reaction-button" type="button" aria-label="Marcar como interessante"><span aria-hidden="true">✦</span> <b>0</b></button></div></div>
     </article>
   </template>
 
   <noscript><p class="startup-error">Ative o JavaScript para abrir os recados.</p></noscript>
   <script src="bootstrap.js"></script>
   <script src="config.js"></script>
-  <script type="module" src="app.js?v=20261002-gossip-copy"></script>
+  <script type="module" src="app.js?v=20261002-ducks-print"></script>
 </body>
 </html>

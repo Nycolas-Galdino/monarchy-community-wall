@@ -261,7 +261,9 @@ async function openStory(letter) {
   const dialog = $("#story-dialog");
   const wrap = $("#story-preview-wrap");
   const download = $("#download-story");
-  wrap.replaceChildren(); wrap.textContent = "Gerando a arte…"; download.hidden = true; setMessage($("#story-message"));
+  const printButton = $("#story-print-mode");
+  setStoryPrintMode(false);
+  wrap.replaceChildren(); wrap.textContent = "Gerando a arte…"; download.hidden = true; printButton.hidden = true; setMessage($("#story-message"));
   dialog.showModal();
   const profile = state.profile ?? { displayName: letter.recipient.name };
   try {
@@ -269,8 +271,16 @@ async function openStory(letter) {
     const url = await createStoryDataUrl({ letter, profile, avatarUrl: state.profile?.hasAvatar ? api.profileAvatarUrl(state.profile.slug) : null });
     state.storyUrl = url;
     const preview = new Image(); preview.src = url; preview.alt = `Prévia do recado para ${profile.displayName}`;
-    wrap.replaceChildren(preview); download.href = url; download.download = safeStoryFileName(profile.displayName); download.hidden = false;
+    wrap.replaceChildren(preview); download.href = url; download.download = safeStoryFileName(profile.displayName); download.hidden = false; printButton.hidden = false;
   } catch (error) { wrap.replaceChildren(); setMessage($("#story-message"), `Não foi possível gerar o PNG: ${error.message}`, "error"); }
+}
+
+function setStoryPrintMode(enabled) {
+  const dialog = $("#story-dialog");
+  const button = $("#story-print-mode");
+  dialog.classList.toggle("story-print-mode", enabled);
+  button.setAttribute("aria-pressed", String(enabled));
+  button.textContent = enabled ? "Voltar para as opções" : "Abrir tela para print";
 }
 
 async function submitLetter(event) {
@@ -594,7 +604,8 @@ function bindEvents() {
   $("#copy-generated-link").addEventListener("click", (event) => copyText($("#generated-profile-link").value, event.currentTarget));
   $("[data-close-profile-success]").addEventListener("click", () => $("#profile-success-dialog").close());
   $("#copy-profile-link").addEventListener("click", (event) => copyText(window.location.href, event.currentTarget));
-  $("[data-close-story]").addEventListener("click", () => $("#story-dialog").close());
+  $("[data-close-story]").addEventListener("click", () => { setStoryPrintMode(false); $("#story-dialog").close(); });
+  $("#story-print-mode").addEventListener("click", () => setStoryPrintMode(!$("#story-dialog").classList.contains("story-print-mode")));
   $$('[data-open-admin]').forEach((button) => button.addEventListener("click", openAdmin));
   $("[data-close-admin]").addEventListener("click", () => $("#admin-dialog").close());
   $("#login-form").addEventListener("submit", submitLogin); $("#logout-button").addEventListener("click", logout);

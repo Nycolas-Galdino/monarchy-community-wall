@@ -21,6 +21,9 @@ if (!index.includes("Mural Anônimo da Comunidade")) throw new Error("O artefato
 if (!index.includes("Psiu… aproxima aqui.") || !index.includes("Central da fofoca") || !index.includes("anonimato não é passe livre")) {
   throw new Error("A linguagem divertida e o limite de segurança da central de fofocas estão ausentes.");
 }
+if (!index.includes('id="story-print-mode"') || !index.includes("não é possível baixar esta imagem") || !index.includes("navegador externo")) {
+  throw new Error("As instruções de print, a limitação do Ducks e a recomendação de navegador externo estão ausentes.");
+}
 if (!index.includes('id="create-profile-button" type="button"')) throw new Error("O botão de criação deve permanecer type=button para nunca submeter sem JavaScript.");
 if (index.includes("data-open-admin")) throw new Error("A navegação pública não pode expor a entrada da moderação.");
 if (!index.includes('id="profile-success-dialog"')) throw new Error("O artefato não contém a confirmação de perfil criado.");
