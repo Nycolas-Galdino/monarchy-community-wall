@@ -106,7 +106,7 @@ export async function createStoryDataUrl({ letter, profile, avatarUrl }) {
   context.fillText("MONARCHY COMMUNITY", 540, 104);
   context.fillStyle = "#28c5f4";
   context.font = "800 26px system-ui, sans-serif";
-  context.fillText("UM RECADO ANÔNIMO CHEGOU ✦", 540, 170);
+  context.fillText("O BABADO ANÔNIMO CHEGOU ✦", 540, 170);
 
   const avatar = await loadRemoteImage(avatarUrl);
   context.save();
@@ -134,7 +134,7 @@ export async function createStoryDataUrl({ letter, profile, avatarUrl }) {
 
   context.textBaseline = "alphabetic";
   context.fillStyle = "rgba(255,255,255,.9)"; context.font = "600 28px system-ui, sans-serif";
-  context.fillText("Pergunte, responda e compartilhe nos stories", 540, 1695);
+  context.fillText("Comente, responda e espalhe nos stories", 540, 1695);
   context.fillStyle = "#25cdf4"; context.font = "800 36px system-ui, sans-serif";
   context.fillText("MONARCHY ✦", 540, 1780);
   return canvas.toDataURL("image/png");

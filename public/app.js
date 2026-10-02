@@ -25,7 +25,7 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 function loadStoryTools() {
-  storyToolsPromise ??= import("./story.js?v=20261001-anonymous-wall");
+  storyToolsPromise ??= import("./story.js?v=20261002-gossip-copy");
   return storyToolsPromise;
 }
 
@@ -132,8 +132,8 @@ function configureProfile(profile) {
   if (profile.description) { $("#profile-description").textContent = profile.description; $("#profile-description").hidden = false; }
   $("#profile-links").hidden = false;
   if (profile.ducksUrl) { $("#profile-ducks-link").href = profile.ducksUrl; $("#profile-ducks-link").hidden = false; }
-  $("#hero-title").innerHTML = `Quer perguntar algo para ${escapeHtml(profile.displayName)}?<br><em>Envie anonimamente.</em>`;
-  $(".hero-intro").textContent = `Este é o mural de ${profile.displayName}. Envie uma pergunta, curiosidade ou recado sem revelar seu nome.`;
+  $("#hero-title").innerHTML = `Tem um babado para ${escapeHtml(profile.displayName)}?<br><em>Conta anonimamente.</em>`;
+  $(".hero-intro").textContent = `Pergunta engasgada ou assunto para colocar na roda? A caixa de ${profile.displayName} está liberada. Mande sem revelar seu nome — e sempre com respeito.`;
   $("#criar-perfil").hidden = true;
   $("#create-profile-nav").hidden = true;
   $("#recipient-field").hidden = true;
@@ -173,7 +173,7 @@ function renderLetters() {
     const empty = document.createElement("div"); empty.className = "empty-state";
     const icon = document.createElement("span"); icon.textContent = "✉";
     const copy = document.createElement("p");
-    copy.textContent = state.profile ? `O mural de ${state.profile.displayName} espera o primeiro recado.` : state.filter ? "Ainda não há recados para essa pessoa." : "O mural está esperando o primeiro recado.";
+    copy.textContent = state.profile ? `A caixa de ${state.profile.displayName} ainda espera o primeiro babado.` : state.filter ? "Ainda não caiu nenhum babado para essa pessoa." : "A central ainda está esperando o primeiro babado.";
     empty.append(icon, copy); grid.append(empty);
   }
   const template = $("#letter-template");
@@ -198,7 +198,7 @@ function renderLetters() {
 
 async function loadPublic({ append = false } = {}) {
   const status = $("#wall-status");
-  if (!append) status.textContent = "Abrindo os recados…";
+  if (!append) status.textContent = "Buscando os babados…";
   if (state.profile?.letterVisibility === "protected" && !state.profileAccessToken) {
     state.letters = [];
     showProfileLock();
@@ -280,7 +280,7 @@ async function submitLetter(event) {
   const body = form.body.value;
   const error = validateDraft(recipient, body);
   if (error) return setMessage($("#letter-message"), error, "error");
-  const button = $("button[type=submit]", form); setBusy(button, true, "Enviando…"); setMessage($("#letter-message"), "Publicando anonimamente…");
+  const button = $("button[type=submit]", form); setBusy(button, true, "Enviando…"); setMessage($("#letter-message"), "Espalhando o babado anonimamente…");
   try {
     const selectedRecipient = state.recipients.find((item) => item.slug === recipient);
     if (state.profile) await api.createProfileLetter(state.profile.slug, body, createIdempotencyKey());
@@ -288,9 +288,9 @@ async function submitLetter(event) {
     form.reset(); $("#letter-counter").textContent = `0 / ${LETTER_MAX_LENGTH}`;
     selectRecipient();
     if (!state.profile && selectedRecipient?.kind === "profile") {
-      setMessage($("#letter-message"), `Recado enviado para ${selectedRecipient.name}. Ele já está no mural pessoal!`, "success");
+      setMessage($("#letter-message"), `Babado enviado para ${selectedRecipient.name}. Já caiu na caixa pessoal!`, "success");
     } else {
-      setMessage($("#letter-message"), "Recado publicado. Ele já está no mural!", "success");
+      setMessage($("#letter-message"), "A bomba foi lançada — o babado já está no mural!", "success");
       state.page = 1; await loadPublic(); $("#mural").scrollIntoView({ behavior: "smooth", block: "start" });
     }
   } catch (requestError) { setMessage($("#letter-message"), requestError.message, "error"); }
@@ -555,7 +555,7 @@ async function renderAdminTab() {
 
 function updateProfilePreview() {
   $("#profile-preview-name").textContent = $("#profile-display-name").value.trim() || "Seu nome";
-  $("#profile-preview-description").textContent = $("#profile-description-input").value.trim() || "Seu mural vai ficar assim.";
+  $("#profile-preview-description").textContent = $("#profile-description-input").value.trim() || "Sua caixa de babados vai ficar assim.";
   $("#profile-preview-visibility").textContent = $("input[name=visibility]:checked").value === "private" ? "Privado · somente pelo link" : "Público";
 }
 

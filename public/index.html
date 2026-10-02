@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Um mural de perguntas e recados anônimos para a comunidade.">
+  <meta name="description" content="Uma central de perguntas, babados e recados anônimos para a comunidade.">
   <meta name="theme-color" content="#1a0d45">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' http://localhost:8787; img-src 'self' data: blob: http://localhost:8787; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%235b347b'/%3E%3Cpath d='M32 13l4.5 14.5L51 32l-14.5 4.5L32 51l-4.5-14.5L13 32l14.5-4.5z' fill='%23efb84d'/%3E%3C/svg%3E">
@@ -38,20 +38,20 @@
           <span class="profile-avatar-fallback" id="profile-avatar-fallback" aria-hidden="true">M</span>
           <div><p class="profile-label">mural de</p><strong id="profile-name"></strong></div>
         </div>
-        <p class="eyebrow">perguntas e recados sem identificação</p>
-        <h1 id="hero-title">Quer perguntar ou dizer algo?<br><em>Envie anonimamente.</em></h1>
-        <p class="hero-intro">Escolha alguém da comunidade e envie uma pergunta, curiosidade ou recado sem revelar seu nome. Pode ser simples como “Qual tua cor favorita?”.</p>
+        <p class="eyebrow">alô, fofoqueiros de plantão ☕👀</p>
+        <h1 id="hero-title">Psiu… aproxima aqui.<br><em>O babado é forte.</em></h1>
+        <p class="hero-intro">Sabe aquela pergunta que está engasgada ou a dúvida que você nunca teve coragem de mandar? A caixa está liberada: solte o babado sem mostrar quem você é — com respeito e sem expor dados pessoais.</p>
         <p class="profile-description" id="profile-description" hidden></p>
         <div class="profile-links" id="profile-links" hidden>
           <a id="profile-ducks-link" class="secondary-button" target="_blank" rel="noopener noreferrer" hidden>Ver perfil no Ducks ↗</a>
           <button id="copy-profile-link" class="secondary-button" type="button">Copiar link deste mural</button>
         </div>
-        <a class="primary-button" href="#escrever">Enviar pergunta ou recado <span aria-hidden="true">↘</span></a>
+        <a class="primary-button" href="#escrever">Soltar o babado <span aria-hidden="true">↘</span></a>
       </div>
       <div class="hero-art" aria-hidden="true">
         <div class="prompt-card">
           <span class="anonymous-badge">ANÔNIMO</span>
-          <p>Qual tua<br>cor favorita?</p>
+          <p>Conta aí:<br>qual é o babado?</p>
           <span class="prompt-mark">?</span>
         </div>
         <span class="spark spark-one">✦</span><span class="spark spark-two">✧</span><span class="spark spark-three">•</span>
@@ -61,17 +61,17 @@
     <section class="profile-creator-section" id="criar-perfil" aria-labelledby="profile-creator-title">
       <div class="section-heading">
         <span class="step">✦</span>
-        <div><p class="eyebrow">seu link, suas perguntas</p><h2 id="profile-creator-title">Crie seu mural pessoal</h2><p class="section-intro">Para leitura aberta, só o nome é obrigatório. Se proteger os recados, você também criará a senha inicial.</p></div>
+        <div><p class="eyebrow">seu link, sua caixa de babados</p><h2 id="profile-creator-title">Abra sua central de fofocas</h2><p class="section-intro">Só o nome é obrigatório para abrir a caixa. Se quiser deixar os babados protegidos, você também criará a senha inicial.</p></div>
       </div>
       <form class="profile-form" id="profile-form" novalidate>
         <div class="profile-form-fields">
           <div class="field"><label for="profile-display-name">Nome do perfil <span aria-hidden="true">*</span></label><input id="profile-display-name" name="displayName" required minlength="2" maxlength="60" autocomplete="nickname" placeholder="Como devemos chamar você?"></div>
-          <div class="field"><label for="profile-description-input">Descrição <span class="optional">opcional</span></label><textarea id="profile-description-input" name="description" rows="3" maxlength="240" placeholder="Conte um pouquinho sobre você ou sobre seu mural."></textarea><span class="counter" id="profile-description-counter">0 / 240</span></div>
+          <div class="field"><label for="profile-description-input">Descrição <span class="optional">opcional</span></label><textarea id="profile-description-input" name="description" rows="3" maxlength="240" placeholder="Conte o clima da sua caixa ou deixe uma provocação para a galera."></textarea><span class="counter" id="profile-description-counter">0 / 240</span></div>
           <div class="field"><label for="profile-ducks-url">Link do perfil Ducks <span class="optional">opcional</span></label><input id="profile-ducks-url" name="ducksUrl" type="url" inputmode="url" placeholder="https://app.duckapps.com.br/seu-perfil"></div>
           <div class="field"><label for="profile-avatar-input">Foto do perfil <span class="optional">opcional · até 5 MB</span></label><input id="profile-avatar-input" name="avatar" type="file" accept="image/jpeg,image/png,image/webp"></div>
           <fieldset class="profile-visibility-field">
             <legend>Quem encontra seu mural?</legend>
-            <label class="visibility-option"><input type="radio" name="visibility" value="public" checked><span><strong>Público</strong><small>Aparece na lista inicial para receber perguntas e recados.</small></span></label>
+            <label class="visibility-option"><input type="radio" name="visibility" value="public" checked><span><strong>Público</strong><small>Aparece na lista inicial para receber perguntas e babados.</small></span></label>
             <label class="visibility-option"><input type="radio" name="visibility" value="private"><span><strong>Privado · somente pelo link</strong><small>Não aparece na lista. Quem tiver o link poderá abrir e escrever.</small></span></label>
           </fieldset>
           <fieldset class="profile-visibility-field">
@@ -93,7 +93,7 @@
         <div class="profile-preview" aria-live="polite">
           <div class="avatar-preview" id="avatar-preview"><span>✦</span></div>
           <span class="profile-visibility-badge" id="profile-preview-visibility">Público</span>
-          <strong id="profile-preview-name">Seu nome</strong><p id="profile-preview-description">Seu mural vai ficar assim.</p>
+          <strong id="profile-preview-name">Seu nome</strong><p id="profile-preview-description">Sua caixa de babados vai ficar assim.</p>
         </div>
         <div class="form-actions profile-form-actions"><p class="form-message" id="profile-message" role="status" aria-live="polite"></p><button class="primary-button" id="create-profile-button" type="button">Gerar meu link <span aria-hidden="true">→</span></button></div>
       </form>
@@ -102,7 +102,7 @@
     <section class="composer-section" id="escrever" aria-labelledby="composer-title">
       <div class="section-heading">
         <span class="step">01</span>
-        <div><p class="eyebrow">pergunte, comente, participe</p><h2 id="composer-title">Envie uma pergunta ou recado</h2></div>
+        <div><p class="eyebrow">a caixa está liberada 🤫✨</p><h2 id="composer-title">Solte a pergunta ou o babado</h2></div>
       </div>
       <form class="composer" id="letter-form" novalidate>
         <fieldset class="field recipient-field" id="recipient-field">
@@ -114,26 +114,26 @@
         </fieldset>
         <div class="fixed-recipient" id="fixed-recipient" hidden><span>Para</span><strong id="fixed-recipient-name"></strong></div>
         <div class="field letter-field">
-          <label for="letter-body">Sua mensagem</label>
-          <textarea id="letter-body" name="body" rows="7" maxlength="600" placeholder="Ex.: Qual tua cor favorita? O que você mais gosta na comunidade?" required></textarea>
+          <label for="letter-body">Conta tudo</label>
+          <textarea id="letter-body" name="body" rows="7" maxlength="600" placeholder="Qual pergunta você sempre quis fazer? Qual é o babado que precisa entrar na roda?" required></textarea>
           <span class="counter" id="letter-counter">0 / 600</span>
         </div>
-        <div class="privacy-note"><span aria-hidden="true">◌</span><p><strong>Seu nome não aparece.</strong> Não pedimos identidade para publicar. Evite incluir dados pessoais no texto.</p></div>
+        <div class="privacy-note"><span aria-hidden="true">✦</span><p><strong>Ninguém verá quem enviou.</strong> Mas anonimato não é passe livre: sem ataques, ameaças ou dados pessoais. O babado pode ser forte sem machucar ninguém.</p></div>
         <div class="form-actions">
           <p class="form-message" id="letter-message" role="status" aria-live="polite"></p>
-          <button class="primary-button" type="submit">Enviar anonimamente <span aria-hidden="true">→</span></button>
+          <button class="primary-button" type="submit">Mandar a bomba <span aria-hidden="true">→</span></button>
         </div>
       </form>
     </section>
 
     <section class="wall-section" id="mural" aria-labelledby="wall-title">
       <div class="section-heading wall-heading">
-        <div class="heading-pair"><span class="step">02</span><div><p class="eyebrow">perguntas e recados que chegaram</p><h2 id="wall-title">Mural anônimo</h2></div></div>
+        <div class="heading-pair"><span class="step">02</span><div><p class="eyebrow">os babados que chegaram ☕</p><h2 id="wall-title">Central da fofoca</h2></div></div>
         <label class="filter-label" id="recipient-filter-label" for="recipient-filter">Mostrar para
           <select id="recipient-filter"><option value="">Todo mundo</option></select>
         </label>
       </div>
-      <div id="wall-status" class="wall-status" role="status" aria-live="polite">Abrindo os recados…</div>
+      <div id="wall-status" class="wall-status" role="status" aria-live="polite">Buscando os babados…</div>
       <div class="profile-lock" id="profile-lock" hidden>
         <span class="profile-lock-mark" aria-hidden="true">✦</span>
         <div><p class="eyebrow">conteúdo reservado</p><h3>Estes recados são protegidos</h3><p id="profile-lock-copy">Digite a senha do perfil para abrir os recados neste navegador.</p></div>
@@ -224,6 +224,6 @@
   <noscript><p class="startup-error">Ative o JavaScript para abrir os recados.</p></noscript>
   <script src="bootstrap.js"></script>
   <script src="config.js"></script>
-  <script type="module" src="app.js?v=20261001-anonymous-wall"></script>
+  <script type="module" src="app.js?v=20261002-gossip-copy"></script>
 </body>
 </html>
