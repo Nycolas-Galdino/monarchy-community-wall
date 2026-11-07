@@ -25,6 +25,9 @@ if (!index.includes('id="story-print-mode"') || !index.includes("não é possív
   throw new Error("As instruções de print, a limitação do Ducks e a recomendação de navegador externo estão ausentes.");
 }
 if (!index.includes('id="create-profile-button" type="button"')) throw new Error("O botão de criação deve permanecer type=button para nunca submeter sem JavaScript.");
+if (!index.includes('class="dialog-close" type="button" data-close-report')) {
+  throw new Error("O fechamento da denúncia deve ser type=button para nunca enviar o formulário.");
+}
 if (index.includes("data-open-admin")) throw new Error("A navegação pública não pode expor a entrada da moderação.");
 if (!index.includes('id="profile-success-dialog"')) throw new Error("O artefato não contém a confirmação de perfil criado.");
 if (!index.includes('id="recipient-options"') || index.includes('<select id="recipient"')) {

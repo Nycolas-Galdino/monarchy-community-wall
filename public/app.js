@@ -692,6 +692,7 @@ function bindEvents() {
   $("#recipient-filter").addEventListener("change", (event) => { state.filter = event.target.value; state.page = 1; loadPublic(); });
   $("#load-more").addEventListener("click", () => { state.page += 1; loadPublic({ append: true }); });
   $("#report-form").addEventListener("submit", submitReport);
+  $("[data-close-report]").addEventListener("click", () => $("#report-dialog").close());
   $("#profile-form").addEventListener("submit", submitProfile);
   $("#profile-unlock-form").addEventListener("submit", submitProfileUnlock);
   $("#create-profile-button").addEventListener("click", () => $("#profile-form").requestSubmit());
