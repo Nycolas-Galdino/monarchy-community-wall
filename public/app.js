@@ -387,7 +387,7 @@ function adminError(error) {
   const message = document.createElement("p"); message.className = "form-message error"; message.textContent = error.message; panel.append(message);
 }
 
-function createAdminLetterCard(letter) {
+function createAdminLetterCard(letter, onChanged) {
   const card = document.createElement("article"); card.className = "admin-card";
   const header = document.createElement("header");
   const meta = document.createElement("span"); meta.textContent = `${letter.recipient_name}${letter.profile_slug ? ` · perfil ${letter.profile_slug}` : ""} · ${formatDate(letter.created_at)}`;
@@ -400,26 +400,124 @@ function createAdminLetterCard(letter) {
     const button = document.createElement("button"); button.type = "button"; button.className = status === "deleted" ? "danger-button" : "secondary-button"; button.textContent = label;
     button.addEventListener("click", async () => {
       setBusy(button, true, "Salvando…");
-      try { await api.moderate(letter.id, status, status === "published" ? "Revisada pela moderação" : "Ação da moderação"); await renderAdminLetters(); state.page = 1; await loadPublic(); }
+      try { await api.moderate(letter.id, status, status === "published" ? "Revisada pela moderação" : "Ação da moderação"); await onChanged(); state.page = 1; await loadPublic(); }
       catch (error) { adminError(error); }
     }); actions.append(button);
   }
   card.append(header, quote, stats, actions); return card;
 }
 
+function createAdminPagination(pagination, onPage) {
+  const navigation = document.createElement("nav");
+  navigation.className = "admin-pagination";
+  navigation.setAttribute("aria-label", "Paginação dos resultados");
+  const previous = document.createElement("button");
+  previous.type = "button"; previous.className = "secondary-button"; previous.textContent = "← Anterior";
+  previous.disabled = !pagination.hasPrevious;
+  previous.addEventListener("click", () => onPage(pagination.page - 1));
+  const summary = document.createElement("span");
+  summary.textContent = `${pagination.total} resultado(s) · página ${pagination.page} de ${pagination.totalPages}`;
+  const next = document.createElement("button");
+  next.type = "button"; next.className = "secondary-button"; next.textContent = "Próxima →";
+  next.disabled = !pagination.hasNext;
+  next.addEventListener("click", () => onPage(pagination.page + 1));
+  navigation.append(previous, summary, next);
+  return navigation;
+}
+
 async function renderAdminLetters() {
   const panel = $("#admin-panel"); panel.replaceChildren();
   const toolbar = document.createElement("div"); toolbar.className = "admin-toolbar";
-  const title = document.createElement("strong"); title.textContent = "Perguntas e recados do mural";
+  const title = document.createElement("strong"); title.textContent = "Recados do mural · 20 por página";
   const filter = document.createElement("select"); filter.setAttribute("aria-label", "Filtrar por status");
   for (const [value, label] of [["all", "Todos"], ["published", "Publicados"], ["hidden", "Ocultos"], ["deleted", "Excluídos"]]) filter.add(new Option(label, value));
-  toolbar.append(title, filter); panel.append(toolbar); const list = document.createElement("div"); list.className = "admin-list"; panel.append(list);
+  toolbar.append(title, filter); panel.append(toolbar);
+  const searchForm = document.createElement("form"); searchForm.className = "admin-search";
+  const searchBy = document.createElement("select"); searchBy.setAttribute("aria-label", "Pesquisar por");
+  searchBy.add(new Option("Palavra no recado", "content")); searchBy.add(new Option("Nome do perfil", "profile"));
+  const searchInput = document.createElement("input"); searchInput.type = "search"; searchInput.maxLength = 80; searchInput.placeholder = "Pesquisar em todos os recados…"; searchInput.setAttribute("aria-label", "Termo da pesquisa");
+  const searchButton = document.createElement("button"); searchButton.type = "submit"; searchButton.className = "secondary-button"; searchButton.textContent = "Pesquisar";
+  const clearButton = document.createElement("button"); clearButton.type = "button"; clearButton.className = "secondary-button"; clearButton.textContent = "Limpar";
+  searchForm.append(searchBy, searchInput, searchButton, clearButton); panel.append(searchForm);
+  const list = document.createElement("div"); list.className = "admin-list"; panel.append(list);
+  let page = 1;
   async function refresh() {
     list.textContent = "Carregando…";
-    try { const data = await api.adminLetters(filter.value); list.replaceChildren(); if (!data.letters.length) list.textContent = "Nenhum recado neste estado."; else data.letters.forEach((letter) => list.append(createAdminLetterCard(letter))); }
+    try {
+      const data = await api.adminLetters({ status: filter.value, page, search: searchInput.value.trim(), searchBy: searchBy.value });
+      list.replaceChildren();
+      if (!data.letters.length) list.textContent = "Nenhum recado encontrado.";
+      else data.letters.forEach((letter) => list.append(createAdminLetterCard(letter, refresh)));
+      list.append(createAdminPagination(data.pagination, async (nextPage) => { page = nextPage; await refresh(); }));
+    }
     catch (error) { adminError(error); }
   }
-  filter.addEventListener("change", refresh); await refresh();
+  filter.addEventListener("change", async () => { page = 1; await refresh(); });
+  searchForm.addEventListener("submit", async (event) => { event.preventDefault(); page = 1; await refresh(); });
+  clearButton.addEventListener("click", async () => { searchInput.value = ""; page = 1; await refresh(); });
+  await refresh();
+}
+
+function createAdminReportCard(report, onChanged) {
+  const statusLabels = { pending: "Pendente", reviewed: "Analisada", dismissed: "Descartada" };
+  const reasonLabels = { abuse: "Abuso ou assédio", privacy: "Privacidade", spam: "Spam", other: "Outro motivo" };
+  const card = document.createElement("article"); card.className = "admin-card report-admin-card";
+  const header = document.createElement("header");
+  const meta = document.createElement("span"); meta.textContent = `${reasonLabels[report.reason] ?? report.reason} · ${report.recipient_name} · ${formatDate(report.created_at)}`;
+  const badge = document.createElement("span"); badge.className = `status-badge status-${report.status}`; badge.textContent = statusLabels[report.status] ?? report.status;
+  header.append(meta, badge);
+  const quote = document.createElement("blockquote"); quote.textContent = report.body;
+  const details = document.createElement("p"); details.className = "form-message";
+  details.textContent = `Recado ${report.letter_status} · ${report.report_count} denúncia(ões)${report.reviewed_by_name ? ` · analisada por ${report.reviewed_by_name}` : ""}${report.review_note ? ` · Nota: ${report.review_note}` : ""}`;
+  const actions = document.createElement("div"); actions.className = "admin-actions";
+  for (const [status, label] of [["reviewed", "Marcar analisada"], ["dismissed", "Descartar denúncia"], ["pending", "Reabrir"]]) {
+    if (status === report.status) continue;
+    const button = document.createElement("button"); button.type = "button"; button.className = "secondary-button"; button.textContent = label;
+    button.addEventListener("click", async () => {
+      setBusy(button, true, "Salvando…");
+      try { await api.reviewReport(report.id, status, status === "dismissed" ? "Denúncia descartada pela moderação" : "Denúncia revisada pela moderação"); await onChanged(); }
+      catch (error) { adminError(error); }
+    });
+    actions.append(button);
+  }
+  if (report.letter_status === "published") {
+    const hideButton = document.createElement("button"); hideButton.type = "button"; hideButton.className = "danger-button"; hideButton.textContent = "Ocultar recado";
+    hideButton.addEventListener("click", async () => {
+      setBusy(hideButton, true, "Ocultando…");
+      try { await api.moderate(report.letter_id, "hidden", "Ocultado durante análise de denúncia"); await onChanged(); state.page = 1; await loadPublic(); }
+      catch (error) { adminError(error); }
+    });
+    actions.append(hideButton);
+  }
+  card.append(header, quote, details, actions);
+  return card;
+}
+
+async function renderAdminReports() {
+  const panel = $("#admin-panel"); panel.replaceChildren();
+  const toolbar = document.createElement("div"); toolbar.className = "admin-toolbar";
+  const title = document.createElement("strong"); title.textContent = "Denúncias para análise · 20 por página";
+  const filters = document.createElement("div"); filters.className = "admin-filter-group";
+  const status = document.createElement("select"); status.setAttribute("aria-label", "Filtrar denúncias por status");
+  for (const [value, label] of [["pending", "Pendentes"], ["reviewed", "Analisadas"], ["dismissed", "Descartadas"], ["all", "Todas"]]) status.add(new Option(label, value));
+  const reason = document.createElement("select"); reason.setAttribute("aria-label", "Filtrar denúncias por motivo");
+  for (const [value, label] of [["all", "Todos os motivos"], ["abuse", "Abuso ou assédio"], ["privacy", "Privacidade"], ["spam", "Spam"], ["other", "Outro"]]) reason.add(new Option(label, value));
+  filters.append(status, reason); toolbar.append(title, filters); panel.append(toolbar);
+  const list = document.createElement("div"); list.className = "admin-list"; panel.append(list);
+  let page = 1;
+  async function refresh() {
+    list.textContent = "Carregando denúncias…";
+    try {
+      const data = await api.adminReports({ status: status.value, reason: reason.value, page });
+      list.replaceChildren();
+      if (!data.reports.length) list.textContent = "Nenhuma denúncia encontrada.";
+      else data.reports.forEach((report) => list.append(createAdminReportCard(report, refresh)));
+      list.append(createAdminPagination(data.pagination, async (nextPage) => { page = nextPage; await refresh(); }));
+    } catch (error) { adminError(error); }
+  }
+  status.addEventListener("change", async () => { page = 1; await refresh(); });
+  reason.addEventListener("change", async () => { page = 1; await refresh(); });
+  await refresh();
 }
 
 async function renderAdminProfiles() {
@@ -558,6 +656,7 @@ async function renderAudit() {
 
 async function renderAdminTab() {
   if (state.adminTab === "letters") return renderAdminLetters();
+  if (state.adminTab === "reports") return renderAdminReports();
   if (state.adminTab === "profiles") return renderAdminProfiles();
   if (state.adminTab === "moderators") return renderModerators();
   return renderAudit();

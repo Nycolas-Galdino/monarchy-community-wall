@@ -64,8 +64,16 @@ export class WallApi {
   report(letterId, reason) { return this.request(`/letters/${letterId}/reports`, { method: "POST", body: JSON.stringify({ reason }) }); }
   login(username, password) { return this.request("/admin/login", { method: "POST", body: JSON.stringify({ username, password }) }); }
   logout() { return this.request("/admin/logout", { method: "POST" }); }
-  adminLetters(status = "all") { return this.request(`/admin/letters?status=${encodeURIComponent(status)}`); }
+  adminLetters({ status = "all", page = 1, search = "", searchBy = "content" } = {}) {
+    const query = new URLSearchParams({ status, page: String(page), searchBy });
+    if (search) query.set("search", search);
+    return this.request(`/admin/letters?${query}`);
+  }
   moderate(letterId, status, note) { return this.request(`/admin/letters/${letterId}`, { method: "PATCH", body: JSON.stringify({ status, note }) }); }
+  adminReports({ status = "pending", reason = "all", page = 1 } = {}) {
+    return this.request(`/admin/reports?${new URLSearchParams({ status, reason, page: String(page) })}`);
+  }
+  reviewReport(reportId, status, note) { return this.request(`/admin/reports/${reportId}`, { method: "PATCH", body: JSON.stringify({ status, note }) }); }
   adminProfiles(status = "all") { return this.request(`/admin/profiles?status=${encodeURIComponent(status)}`); }
   moderateProfile(profileId, status, note) { return this.request(`/admin/profiles/${profileId}`, { method: "PATCH", body: JSON.stringify({ status, note }) }); }
   setProfileVisibility(profileId, visibility) { return this.request(`/admin/profiles/${profileId}/visibility`, { method: "PATCH", body: JSON.stringify({ visibility }) }); }

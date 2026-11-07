@@ -8,6 +8,7 @@ export const PROFILE_NAME_MAX_LENGTH = 60;
 export const PROFILE_DESCRIPTION_MAX_LENGTH = 240;
 export const AVATAR_MAX_BYTES = 350 * 1024;
 export const REPORT_REASONS = new Set(["abuse", "privacy", "spam", "other"]);
+export const REPORT_REVIEW_STATUSES = new Set(["pending", "reviewed", "dismissed"]);
 export const LETTER_STATUSES = new Set(["published", "hidden", "deleted"]);
 export const PROFILE_STATUSES = new Set(["active", "hidden", "deleted"]);
 export const PROFILE_VISIBILITIES = new Set(["public", "private"]);
@@ -63,6 +64,30 @@ export function validateModerationInput(input) {
   if (!LETTER_STATUSES.has(status)) return { ok: false, error: "Status de moderação inválido." };
   if (textLength(note) > MODERATION_NOTE_MAX_LENGTH) return { ok: false, error: "A nota deve ter até 240 caracteres." };
   return { ok: true, value: { status, note } };
+}
+
+export function validateReportReviewInput(input) {
+  const status = String(input?.status ?? "").trim().toLowerCase();
+  const note = normalizePlainText(input?.note);
+  if (!REPORT_REVIEW_STATUSES.has(status)) return { ok: false, error: "Status da denúncia inválido." };
+  if (textLength(note) > MODERATION_NOTE_MAX_LENGTH) return { ok: false, error: "A nota deve ter até 240 caracteres." };
+  return { ok: true, value: { status, note } };
+}
+
+export function validateAdminLetterSearch(search, searchBy) {
+  const query = normalizePlainText(search);
+  const field = String(searchBy ?? "content").trim().toLowerCase();
+  if (!new Set(["content", "profile"]).has(field)) {
+    return { ok: false, error: "Tipo de pesquisa inválido." };
+  }
+  if (textLength(query) > 80) {
+    return { ok: false, error: "A pesquisa deve ter no máximo 80 caracteres." };
+  }
+  return { ok: true, value: { query, field } };
+}
+
+export function escapeLikePattern(value) {
+  return String(value).replace(/[\\%_]/g, "\\$&");
 }
 
 export function slugifyProfileName(value) {

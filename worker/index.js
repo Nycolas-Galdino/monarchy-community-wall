@@ -2,6 +2,7 @@ import {
   REPORT_REASONS,
   allowedOrigin,
   decodeAndValidateAvatar,
+  escapeLikePattern,
   hashPassword,
   normalizePlainText,
   parsePositiveInt,
@@ -10,6 +11,7 @@ import {
   sha256,
   textLength,
   validateLetterInput,
+  validateAdminLetterSearch,
   validateModerationInput,
   validateModeratorInput,
   validateProfileInput,
@@ -17,12 +19,14 @@ import {
   validateProfileModerationInput,
   validateProfilePasswordInput,
   validateProfileVisibilityInput,
+  validateReportReviewInput,
   slugifyProfileName,
   verifyPassword
 } from "./domain.js";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 const DUMMY_PASSWORD_HASH = "pbkdf2_sha256$100000$AAAAAAAAAAAAAAAAAAAAAA$4xu9zyUhIT1-X1c3WzYqkFpmoegrbv5v-CWWppWKatw";
+const ADMIN_PAGE_SIZE = 20;
 
 function securityHeaders(origin, env) {
   const headers = {
@@ -508,13 +512,39 @@ async function logout(request, env, moderator) {
 
 async function listAdminLetters(request, env, url) {
   const status = String(url.searchParams.get("status") ?? "all");
+  if (!["all", "published", "hidden", "deleted"].includes(status)) {
+    return fail("Status de recado inválido.", 422, request, env, "validation_error");
+  }
+  const search = validateAdminLetterSearch(url.searchParams.get("search"), url.searchParams.get("searchBy"));
+  if (!search.ok) return fail(search.error, 422, request, env, "validation_error");
+  const page = parsePositiveInt(url.searchParams.get("page"), 1, 100_000);
+  const offset = (page - 1) * ADMIN_PAGE_SIZE;
+  const conditions = ["1 = 1"];
   const bindings = [];
-  let where = "1 = 1";
   if (["published", "hidden", "deleted"].includes(status)) {
-    where = "l.status = ?";
+    conditions.push("l.status = ?");
     bindings.push(status);
   }
-  const result = await env.DB.prepare(`
+  if (search.value.query) {
+    const pattern = `%${escapeLikePattern(search.value.query)}%`;
+    if (search.value.field === "profile") {
+      conditions.push("(COALESCE(p.display_name, r.display_name) LIKE ? ESCAPE '\\' COLLATE NOCASE OR COALESCE(p.slug, r.slug) LIKE ? ESCAPE '\\' COLLATE NOCASE)");
+      bindings.push(pattern, pattern);
+    } else {
+      conditions.push("l.body LIKE ? ESCAPE '\\' COLLATE NOCASE");
+      bindings.push(pattern);
+    }
+  }
+  const where = conditions.join(" AND ");
+  const [countResult, listResult] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT COUNT(*) AS total
+      FROM letters l
+      JOIN recipients r ON r.id = l.recipient_id
+      LEFT JOIN profiles p ON p.recipient_id = r.id
+      WHERE ${where}
+    `).bind(...bindings),
+    env.DB.prepare(`
     SELECT l.id, l.body, l.status, l.report_count, l.reaction_count, l.created_at, l.moderated_at, l.moderation_note,
            r.slug AS recipient_slug, r.display_name AS recipient_name, r.accent AS recipient_accent,
            p.slug AS profile_slug,
@@ -524,10 +554,80 @@ async function listAdminLetters(request, env, url) {
     LEFT JOIN profiles p ON p.recipient_id = r.id
     LEFT JOIN moderators m ON m.id = l.moderated_by
     WHERE ${where}
-    ORDER BY CASE WHEN l.report_count > 0 THEN 0 ELSE 1 END, l.created_at DESC
-    LIMIT 200
-  `).bind(...bindings).all();
-  return json({ letters: result.results ?? [] }, 200, request, env);
+    ORDER BY l.created_at DESC, l.rowid DESC
+    LIMIT ? OFFSET ?
+    `).bind(...bindings, ADMIN_PAGE_SIZE, offset)
+  ]);
+  const total = Number(countResult.results?.[0]?.total ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  return json({
+    letters: listResult.results ?? [],
+    pagination: { page, pageSize: ADMIN_PAGE_SIZE, total, totalPages, hasPrevious: page > 1, hasNext: page < totalPages }
+  }, 200, request, env);
+}
+
+async function listAdminReports(request, env, url) {
+  const status = String(url.searchParams.get("status") ?? "pending");
+  const reason = String(url.searchParams.get("reason") ?? "all");
+  if (!["all", "pending", "reviewed", "dismissed"].includes(status)) {
+    return fail("Status de denúncia inválido.", 422, request, env, "validation_error");
+  }
+  if (reason !== "all" && !REPORT_REASONS.has(reason)) {
+    return fail("Motivo de denúncia inválido.", 422, request, env, "validation_error");
+  }
+  const page = parsePositiveInt(url.searchParams.get("page"), 1, 100_000);
+  const offset = (page - 1) * ADMIN_PAGE_SIZE;
+  const conditions = ["1 = 1"];
+  const bindings = [];
+  if (status !== "all") { conditions.push("rp.status = ?"); bindings.push(status); }
+  if (reason !== "all") { conditions.push("rp.reason = ?"); bindings.push(reason); }
+  const where = conditions.join(" AND ");
+  const [countResult, listResult] = await env.DB.batch([
+    env.DB.prepare(`SELECT COUNT(*) AS total FROM reports rp WHERE ${where}`).bind(...bindings),
+    env.DB.prepare(`
+      SELECT rp.id, rp.reason, rp.status, rp.created_at, rp.reviewed_at, rp.review_note,
+             l.id AS letter_id, l.body, l.status AS letter_status, l.report_count,
+             rec.display_name AS recipient_name, rec.slug AS recipient_slug, p.slug AS profile_slug,
+             m.display_name AS reviewed_by_name
+      FROM reports rp
+      JOIN letters l ON l.id = rp.letter_id
+      JOIN recipients rec ON rec.id = l.recipient_id
+      LEFT JOIN profiles p ON p.recipient_id = rec.id
+      LEFT JOIN moderators m ON m.id = rp.reviewed_by
+      WHERE ${where}
+      ORDER BY rp.created_at DESC, rp.rowid DESC
+      LIMIT ? OFFSET ?
+    `).bind(...bindings, ADMIN_PAGE_SIZE, offset)
+  ]);
+  const total = Number(countResult.results?.[0]?.total ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  return json({
+    reports: listResult.results ?? [],
+    pagination: { page, pageSize: ADMIN_PAGE_SIZE, total, totalPages, hasPrevious: page > 1, hasNext: page < totalPages }
+  }, 200, request, env);
+}
+
+async function reviewReport(request, env, reportId, moderator) {
+  const validation = validateReportReviewInput(await readJson(request));
+  if (!validation.ok) return fail(validation.error, 422, request, env, "validation_error");
+  const reviewed = validation.value.status !== "pending";
+  const result = await env.DB.prepare(`
+    UPDATE reports
+    SET status = ?, review_note = ?, reviewed_at = ?, reviewed_by = ?
+    WHERE id = ?
+  `).bind(
+    validation.value.status,
+    validation.value.note || null,
+    reviewed ? new Date().toISOString() : null,
+    reviewed ? moderator.id : null,
+    reportId
+  ).run();
+  if (!result.meta?.changes) return fail("Denúncia não encontrada.", 404, request, env, "not_found");
+  await env.DB.prepare(`
+    INSERT INTO audit_log (moderator_id, action, target_type, target_id, details)
+    VALUES (?, 'report.review', 'report', ?, ?)
+  `).bind(moderator.id, reportId, JSON.stringify(validation.value)).run();
+  return json({ updated: true, status: validation.value.status }, 200, request, env);
 }
 
 async function moderateLetter(request, env, letterId, moderator) {
@@ -697,6 +797,9 @@ async function route(request, env) {
     if (request.method === "GET" && path === "/admin/letters") return listAdminLetters(request, env, url);
     const letterMatch = path.match(/^\/admin\/letters\/([0-9a-f-]+)$/i);
     if (request.method === "PATCH" && letterMatch) return moderateLetter(request, env, letterMatch[1], moderator);
+    if (request.method === "GET" && path === "/admin/reports") return listAdminReports(request, env, url);
+    const adminReportMatch = path.match(/^\/admin\/reports\/([0-9a-f-]+)$/i);
+    if (request.method === "PATCH" && adminReportMatch) return reviewReport(request, env, adminReportMatch[1], moderator);
     if (request.method === "GET" && path === "/admin/profiles") return listAdminProfiles(request, env, url);
     const profileVisibilityMatch = path.match(/^\/admin\/profiles\/([0-9a-f-]+)\/visibility$/i);
     if (request.method === "PATCH" && profileVisibilityMatch) return setProfileVisibility(request, env, profileVisibilityMatch[1], moderator);

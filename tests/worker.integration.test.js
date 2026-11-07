@@ -1,4 +1,4 @@
-import { exports } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 const origin = "http://localhost:8080";
@@ -75,6 +75,45 @@ describe("community wall API", () => {
     const token = loginBody.token;
     expect(token.length).toBeGreaterThan(30);
 
+    expect((await request("/admin/reports")).status).toBe(401);
+    const pendingReports = await request("/admin/reports?status=pending&page=1", { token });
+    expect(pendingReports.status).toBe(200);
+    const pendingReportData = await pendingReports.json();
+    expect(pendingReportData.reports).toHaveLength(1);
+    expect(pendingReportData.pagination).toMatchObject({ page: 1, pageSize: 20, total: 1, hasNext: false });
+    const reportId = pendingReportData.reports[0].id;
+    expect((await request(`/admin/reports/${reportId}`, { method: "PATCH", body: { status: "reviewed" } })).status).toBe(401);
+    const reviewedReport = await request(`/admin/reports/${reportId}`, { method: "PATCH", token, body: { status: "reviewed", note: "Conteúdo conferido" } });
+    expect(reviewedReport.status).toBe(200);
+    expect((await (await request("/admin/reports?status=pending", { token })).json()).reports).toHaveLength(0);
+    expect((await (await request("/admin/reports?status=reviewed", { token })).json()).reports[0]).toMatchObject({ id: reportId, review_note: "Conteúdo conferido" });
+
+    const recipient = await env.DB.prepare("SELECT id FROM recipients WHERE slug = 'moderacao'").first();
+    const seededLetters = Array.from({ length: 25 }, (_, index) => env.DB.prepare(`
+      INSERT INTO letters (id, recipient_id, body, status, idempotency_key, request_hash, created_at)
+      VALUES (?, ?, ?, 'hidden', ?, ?, ?)
+    `).bind(
+      `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      recipient.id,
+      `Recado paginado número ${index} segredo-paginado-${index}`,
+      `pagination_key_${String(index).padStart(20, "0")}`,
+      `pagination_hash_${index}`,
+      new Date(Date.UTC(2031, 0, index + 1)).toISOString()
+    ));
+    await env.DB.batch(seededLetters);
+    const firstAdminPage = await request("/admin/letters?status=all&page=1", { token });
+    expect(firstAdminPage.status).toBe(200);
+    const firstAdminPageData = await firstAdminPage.json();
+    expect(firstAdminPageData.letters).toHaveLength(20);
+    expect(firstAdminPageData.letters[0].body).toContain("número 24");
+    expect(firstAdminPageData.pagination).toMatchObject({ page: 1, pageSize: 20, total: 26, totalPages: 2, hasNext: true });
+    const secondAdminPageData = await (await request("/admin/letters?status=all&page=2", { token })).json();
+    expect(secondAdminPageData.letters).toHaveLength(6);
+    expect(secondAdminPageData.pagination.hasPrevious).toBe(true);
+    const contentSearch = await request("/admin/letters?search=segredo-paginado-7&searchBy=content", { token });
+    expect((await contentSearch.json()).letters).toHaveLength(1);
+    expect((await request(`/admin/letters?search=${"x".repeat(81)}&searchBy=content`, { token })).status).toBe(422);
+
     const profileKey = "test_profile_key_123456789";
     const avatarData = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
     const profileCreated = await request("/profiles", {
@@ -131,6 +170,10 @@ describe("community wall API", () => {
     expect((await profileList.json()).letters[0].body).toContain("somente no mural pessoal");
     const globalAfterProfile = await request("/letters");
     expect((await globalAfterProfile.json()).letters.some((item) => item.body.includes("somente no mural pessoal"))).toBe(false);
+    const profileSearch = await request("/admin/letters?search=Lila%20Monarchy&searchBy=profile", { token });
+    const profileSearchData = await profileSearch.json();
+    expect(profileSearchData.letters).toHaveLength(1);
+    expect(profileSearchData.letters[0].profile_slug).toBe(profileSlug);
 
     const privateCreated = await request("/profiles", {
       method: "POST",
@@ -255,6 +298,7 @@ describe("community wall API", () => {
     expect((await request("/admin/audit", { token }).then((response) => response.json())).entries.some((entry) => entry.action === "profile.letter_visibility")).toBe(true);
     const auditEntries = (await (await request("/admin/audit", { token })).json()).entries;
     expect(auditEntries.some((entry) => entry.action === "profile.password_reset")).toBe(true);
+    expect(auditEntries.some((entry) => entry.action === "report.review")).toBe(true);
     expect(JSON.stringify(auditEntries)).not.toContain("senha-inicial-do-perfil");
   });
 

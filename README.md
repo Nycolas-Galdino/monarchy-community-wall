@@ -30,7 +30,9 @@ O Pages nunca recebe hash de senha, segredo do Worker ou acesso direto ao banco.
 - publicação sem nome do remetente, limitada a 600 caracteres e idempotente;
 - marcação anônima persistida (uma marca de interesse por origem e recado);
 - denúncia por motivo, deduplicada, com ocultação automática configurável;
-- painel para listar, publicar, ocultar ou excluir logicamente recados;
+- painel para listar, publicar, ocultar ou excluir logicamente recados, sempre dos mais recentes para os mais antigos e em páginas de 20 itens;
+- pesquisa administrativa no banco inteiro por palavras do recado ou pelo nome/slug do perfil, com termo limitado a 80 caracteres;
+- fila de denúncias paginada, filtrável por estado e motivo, com análise/descartes auditados e atalho para ocultar o recado denunciado;
 - área de moderação fora da navegação pública, acessível por `moderacao.html` e ainda protegida por login;
 - histórico administrativo de perfis com data, status, quantidade de recados e ações para copiar ou abrir cada link;
 - alteração auditada entre perfil público e privado diretamente no histórico administrativo, com controles responsivos para celular;

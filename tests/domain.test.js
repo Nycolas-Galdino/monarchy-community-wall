@@ -5,6 +5,7 @@ import {
   hashPassword,
   normalizePlainText,
   slugifyProfileName,
+  validateAdminLetterSearch,
   validateDucksUrl,
   validateLetterInput,
   validateModeratorInput,
@@ -12,6 +13,7 @@ import {
   validateProfileLetterVisibilityInput,
   validateProfilePasswordInput,
   validateProfileVisibilityInput,
+  validateReportReviewInput,
   verifyPassword
 } from "../worker/domain.js";
 import {
@@ -40,6 +42,15 @@ describe("validation and security helpers", () => {
   it("requires strong-enough moderator credentials", () => {
     expect(validateModeratorInput({ username: "mod", displayName: "Mod", password: "curta" }).ok).toBe(false);
     expect(validateModeratorInput({ username: "mod.ana", displayName: "Ana", password: "uma-senha-com-12" }).ok).toBe(true);
+  });
+
+  it("bounds administrative searches and validates report review states", () => {
+    expect(validateAdminLetterSearch("  palavra-chave  ", "content")).toEqual({ ok: true, value: { query: "palavra-chave", field: "content" } });
+    expect(validateAdminLetterSearch("Lila", "profile").ok).toBe(true);
+    expect(validateAdminLetterSearch("Lila", "unknown").ok).toBe(false);
+    expect(validateAdminLetterSearch("x".repeat(81), "content").ok).toBe(false);
+    expect(validateReportReviewInput({ status: "reviewed", note: "Analisada" }).ok).toBe(true);
+    expect(validateReportReviewInput({ status: "invalid" }).ok).toBe(false);
   });
 
   it("hashes passwords with salt and verifies without storing plaintext", async () => {
