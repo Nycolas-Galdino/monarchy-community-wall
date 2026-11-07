@@ -404,7 +404,9 @@ async function reportLetter(request, env, letterId) {
   const rate = await enforceRateLimit(request, env, "report-letter", 8, 3600);
   if (!rate.allowed) return json({ error: { code: "rate_limited", message: "Limite de denúncias atingido. Tente novamente mais tarde." } }, 429, request, env, { "retry-after": String(rate.retryAfter) });
   const body = await readJson(request);
-  const reason = String(body?.reason ?? "");
+  const requestedReason = String(body?.reason ?? "");
+  const requestType = requestedReason === "removal" ? "removal" : "report";
+  const reason = requestType === "removal" ? "other" : requestedReason;
   if (!REPORT_REASONS.has(reason)) return fail("Motivo de denúncia inválido.", 422, request, env, "validation_error");
   const letter = await env.DB.prepare(`
     SELECT l.id, l.status FROM letters l
@@ -415,17 +417,18 @@ async function reportLetter(request, env, letterId) {
   if (!letter || letter.status === "deleted") return fail("Cartinha não encontrada.", 404, request, env, "not_found");
   const reportId = crypto.randomUUID();
   const inserted = await env.DB.prepare(`
-    INSERT OR IGNORE INTO reports (id, letter_id, reason, reporter_fingerprint)
-    VALUES (?, ?, ?, ?)
-  `).bind(reportId, letterId, reason, rate.fingerprint).run();
-  if (!inserted.meta?.changes) return json({ reported: false, duplicate: true }, 200, request, env);
+    INSERT OR IGNORE INTO reports (id, letter_id, reason, reporter_fingerprint, request_type)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(reportId, letterId, reason, rate.fingerprint, requestType).run();
+  if (!inserted.meta?.changes) return json({ reported: false, duplicate: true, requestType }, 200, request, env);
+  if (requestType === "removal") return json({ reported: true, requestType }, 201, request, env);
   await env.DB.prepare("UPDATE letters SET report_count = report_count + 1 WHERE id = ?").bind(letterId).run();
   const threshold = parsePositiveInt(env.REPORT_AUTO_FLAG_THRESHOLD, 3, 20);
   const updated = await env.DB.prepare("SELECT report_count FROM letters WHERE id = ?").bind(letterId).first();
   if (Number(updated.report_count) >= threshold) {
     await env.DB.prepare("UPDATE letters SET status = 'hidden', moderation_note = 'Ocultada automaticamente por denúncias' WHERE id = ? AND status = 'published'").bind(letterId).run();
   }
-  return json({ reported: true }, 201, request, env);
+  return json({ reported: true, requestType }, 201, request, env);
 }
 
 async function reactToLetter(request, env, letterId) {
@@ -572,7 +575,7 @@ async function listAdminReports(request, env, url) {
   if (!["all", "pending", "reviewed", "dismissed"].includes(status)) {
     return fail("Status de denúncia inválido.", 422, request, env, "validation_error");
   }
-  if (reason !== "all" && !REPORT_REASONS.has(reason)) {
+  if (reason !== "all" && reason !== "removal" && !REPORT_REASONS.has(reason)) {
     return fail("Motivo de denúncia inválido.", 422, request, env, "validation_error");
   }
   const page = parsePositiveInt(url.searchParams.get("page"), 1, 100_000);
@@ -580,12 +583,17 @@ async function listAdminReports(request, env, url) {
   const conditions = ["1 = 1"];
   const bindings = [];
   if (status !== "all") { conditions.push("rp.status = ?"); bindings.push(status); }
-  if (reason !== "all") { conditions.push("rp.reason = ?"); bindings.push(reason); }
+  if (reason === "removal") {
+    conditions.push("rp.request_type = 'removal'");
+  } else if (reason !== "all") {
+    conditions.push("rp.request_type = 'report' AND rp.reason = ?");
+    bindings.push(reason);
+  }
   const where = conditions.join(" AND ");
   const [countResult, listResult] = await env.DB.batch([
     env.DB.prepare(`SELECT COUNT(*) AS total FROM reports rp WHERE ${where}`).bind(...bindings),
     env.DB.prepare(`
-      SELECT rp.id, rp.reason, rp.status, rp.created_at, rp.reviewed_at, rp.review_note,
+      SELECT rp.id, rp.reason, rp.request_type, rp.status, rp.created_at, rp.reviewed_at, rp.review_note,
              l.id AS letter_id, l.body, l.status AS letter_status, l.report_count,
              rec.display_name AS recipient_name, rec.slug AS recipient_slug, p.slug AS profile_slug,
              m.display_name AS reviewed_by_name

@@ -254,7 +254,12 @@ async function react(letterId, button) {
 }
 
 function openReport(letterId) {
-  $("#report-letter-id").value = letterId; setMessage($("#report-message")); $("#report-dialog").showModal();
+  $("#report-form").reset(); $("#report-letter-id").value = letterId; setMessage($("#report-message")); updateReportActionCopy(); $("#report-dialog").showModal();
+}
+
+function updateReportActionCopy() {
+  const reason = $("#report-reason").value;
+  $("#report-submit").textContent = reason === "removal" ? "Enviar solicitação de exclusão" : (reason ? "Enviar denúncia" : "Continuar");
 }
 
 async function openStory(letter) {
@@ -355,8 +360,13 @@ async function submitProfile(event) {
 async function submitReport(event) {
   event.preventDefault(); const button = $("#report-submit"); setBusy(button, true, "Enviando…");
   try {
-    const data = await api.report($("#report-letter-id").value, $("#report-reason").value);
-    setMessage($("#report-message"), data.duplicate ? "Você já denunciou este recado." : "Denúncia enviada para a moderação.", "success");
+    const reason = $("#report-reason").value;
+    const data = await api.report($("#report-letter-id").value, reason);
+    const removal = reason === "removal";
+    const message = data.duplicate
+      ? (removal ? "Você já solicitou a exclusão deste recado." : "Você já denunciou este recado.")
+      : (removal ? "Solicitação de exclusão enviada para a Staff." : "Denúncia enviada para a moderação.");
+    setMessage($("#report-message"), message, "success");
     setTimeout(() => $("#report-dialog").close(), 900);
   } catch (error) { setMessage($("#report-message"), error.message, "error"); }
   finally { setBusy(button, false); }
@@ -463,12 +473,13 @@ function createAdminReportCard(report, onChanged) {
   const reasonLabels = { abuse: "Abuso ou assédio", privacy: "Privacidade", spam: "Spam", other: "Outro motivo" };
   const card = document.createElement("article"); card.className = "admin-card report-admin-card";
   const header = document.createElement("header");
-  const meta = document.createElement("span"); meta.textContent = `${reasonLabels[report.reason] ?? report.reason} · ${report.recipient_name} · ${formatDate(report.created_at)}`;
+  const requestLabel = report.request_type === "removal" ? "Solicitação de exclusão" : (reasonLabels[report.reason] ?? report.reason);
+  const meta = document.createElement("span"); meta.textContent = `${requestLabel} · ${report.recipient_name} · ${formatDate(report.created_at)}`;
   const badge = document.createElement("span"); badge.className = `status-badge status-${report.status}`; badge.textContent = statusLabels[report.status] ?? report.status;
   header.append(meta, badge);
   const quote = document.createElement("blockquote"); quote.textContent = report.body;
   const details = document.createElement("p"); details.className = "form-message";
-  details.textContent = `Recado ${report.letter_status} · ${report.report_count} denúncia(ões)${report.reviewed_by_name ? ` · analisada por ${report.reviewed_by_name}` : ""}${report.review_note ? ` · Nota: ${report.review_note}` : ""}`;
+  details.textContent = `Recado ${report.letter_status}${report.request_type === "report" ? ` · ${report.report_count} denúncia(ões)` : ""}${report.reviewed_by_name ? ` · analisada por ${report.reviewed_by_name}` : ""}${report.review_note ? ` · Nota: ${report.review_note}` : ""}`;
   const actions = document.createElement("div"); actions.className = "admin-actions";
   for (const [status, label] of [["reviewed", "Marcar analisada"], ["dismissed", "Descartar denúncia"], ["pending", "Reabrir"]]) {
     if (status === report.status) continue;
@@ -489,6 +500,15 @@ function createAdminReportCard(report, onChanged) {
     });
     actions.append(hideButton);
   }
+  if (report.request_type === "removal" && report.letter_status !== "deleted") {
+    const deleteButton = document.createElement("button"); deleteButton.type = "button"; deleteButton.className = "danger-button"; deleteButton.textContent = "Excluir recado";
+    deleteButton.addEventListener("click", async () => {
+      setBusy(deleteButton, true, "Excluindo…");
+      try { await api.moderate(report.letter_id, "deleted", "Excluído após solicitação analisada pela moderação"); await onChanged(); state.page = 1; await loadPublic(); }
+      catch (error) { adminError(error); }
+    });
+    actions.append(deleteButton);
+  }
   card.append(header, quote, details, actions);
   return card;
 }
@@ -501,7 +521,7 @@ async function renderAdminReports() {
   const status = document.createElement("select"); status.setAttribute("aria-label", "Filtrar denúncias por status");
   for (const [value, label] of [["pending", "Pendentes"], ["reviewed", "Analisadas"], ["dismissed", "Descartadas"], ["all", "Todas"]]) status.add(new Option(label, value));
   const reason = document.createElement("select"); reason.setAttribute("aria-label", "Filtrar denúncias por motivo");
-  for (const [value, label] of [["all", "Todos os motivos"], ["abuse", "Abuso ou assédio"], ["privacy", "Privacidade"], ["spam", "Spam"], ["other", "Outro"]]) reason.add(new Option(label, value));
+  for (const [value, label] of [["all", "Todos os motivos"], ["removal", "Solicitações de exclusão"], ["abuse", "Abuso ou assédio"], ["privacy", "Privacidade"], ["spam", "Spam"], ["other", "Outro"]]) reason.add(new Option(label, value));
   filters.append(status, reason); toolbar.append(title, filters); panel.append(toolbar);
   const list = document.createElement("div"); list.className = "admin-list"; panel.append(list);
   let page = 1;
@@ -692,6 +712,7 @@ function bindEvents() {
   $("#recipient-filter").addEventListener("change", (event) => { state.filter = event.target.value; state.page = 1; loadPublic(); });
   $("#load-more").addEventListener("click", () => { state.page += 1; loadPublic({ append: true }); });
   $("#report-form").addEventListener("submit", submitReport);
+  $("#report-reason").addEventListener("change", updateReportActionCopy);
   $("[data-close-report]").addEventListener("click", () => $("#report-dialog").close());
   $("#profile-form").addEventListener("submit", submitProfile);
   $("#profile-unlock-form").addEventListener("submit", submitProfileUnlock);

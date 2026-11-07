@@ -157,14 +157,14 @@
 
   <dialog id="report-dialog" class="dialog">
     <form method="dialog" id="report-form">
-      <button class="dialog-close" type="button" data-close-report aria-label="Fechar denúncia">×</button>
-      <p class="eyebrow">ajude a manter o espaço seguro</p><h2>Denunciar recado</h2>
+      <button class="dialog-close" type="button" data-close-report aria-label="Fechar opções">×</button>
+      <p class="eyebrow">opções do recado</p><h2>Como podemos ajudar?</h2>
       <input type="hidden" id="report-letter-id">
-      <label for="report-reason">O que aconteceu?</label>
-      <select id="report-reason" required><option value="abuse">Conteúdo ofensivo</option><option value="privacy">Expõe informação pessoal</option><option value="spam">Spam</option><option value="other">Outro motivo</option></select>
-      <p class="dialog-copy">A equipe de moderação verá a denúncia. Uma mesma pessoa só pode denunciar cada recado uma vez.</p>
+      <label for="report-reason">O que você quer fazer?</label>
+      <select id="report-reason" required><option value="" selected disabled>Escolha uma opção</option><option value="removal">Solicitar exclusão do recado</option><option value="abuse">Denunciar conteúdo ofensivo</option><option value="privacy">Denunciar exposição de informação pessoal</option><option value="spam">Denunciar spam</option><option value="other">Denunciar por outro motivo</option></select>
+      <p class="dialog-copy">A Staff analisará a solicitação. Pedidos de exclusão não removem nem ocultam o recado automaticamente.</p>
       <p id="report-message" class="form-message" role="status"></p>
-      <button class="danger-button" id="report-submit" type="submit">Enviar denúncia</button>
+      <button class="danger-button" id="report-submit" type="submit">Continuar</button>
     </form>
   </dialog>
 
@@ -225,7 +225,7 @@
 
   <template id="letter-template">
     <article class="letter-card">
-      <div class="letter-top"><span class="recipient-pill"></span><button class="icon-button report-button" title="Denunciar recado" aria-label="Denunciar recado">•••</button></div>
+      <div class="letter-top"><span class="recipient-pill"></span><button class="icon-button report-button" title="Opções do recado" aria-label="Abrir opções do recado">•••</button></div>
       <p class="letter-body"></p>
       <div class="letter-bottom"><time></time><div class="letter-actions"><button class="story-button" type="button" aria-label="Preparar imagem para print ou story">Print / Story ↗</button><button class="reaction-button" type="button" aria-label="Marcar como interessante"><span aria-hidden="true">✦</span> <b>0</b></button></div></div>
     </article>

@@ -54,6 +54,11 @@ describe("community wall API", () => {
 
     const report = await request(`/letters/${letterId}/reports`, { method: "POST", headers: { "cf-connecting-ip": "192.0.2.30" }, body: { reason: "other" } });
     expect(report.status).toBe(201);
+    const removalRequest = await request(`/letters/${letterId}/reports`, { method: "POST", headers: { "cf-connecting-ip": "192.0.2.31" }, body: { reason: "removal" } });
+    expect(removalRequest.status).toBe(201);
+    expect(await removalRequest.json()).toMatchObject({ reported: true, requestType: "removal" });
+    const afterRemovalRequest = await request("/letters");
+    expect((await afterRemovalRequest.json()).letters[0]).toMatchObject({ id: letterId, reports: 1 });
 
     const bootstrap = await request("/admin/bootstrap", {
       method: "POST",
@@ -79,14 +84,20 @@ describe("community wall API", () => {
     const pendingReports = await request("/admin/reports?status=pending&page=1", { token });
     expect(pendingReports.status).toBe(200);
     const pendingReportData = await pendingReports.json();
-    expect(pendingReportData.reports).toHaveLength(1);
-    expect(pendingReportData.pagination).toMatchObject({ page: 1, pageSize: 20, total: 1, hasNext: false });
-    const reportId = pendingReportData.reports[0].id;
+    expect(pendingReportData.reports).toHaveLength(2);
+    expect(pendingReportData.pagination).toMatchObject({ page: 1, pageSize: 20, total: 2, hasNext: false });
+    const reportId = pendingReportData.reports.find((item) => item.request_type === "report").id;
+    const removalReport = pendingReportData.reports.find((item) => item.request_type === "removal");
+    expect(removalReport).toMatchObject({ reason: "other", letter_id: letterId, letter_status: "published" });
+    const removalFilter = await request("/admin/reports?status=pending&reason=removal", { token });
+    expect((await removalFilter.json()).reports).toEqual([expect.objectContaining({ id: removalReport.id, request_type: "removal" })]);
     expect((await request(`/admin/reports/${reportId}`, { method: "PATCH", body: { status: "reviewed" } })).status).toBe(401);
     const reviewedReport = await request(`/admin/reports/${reportId}`, { method: "PATCH", token, body: { status: "reviewed", note: "Conteúdo conferido" } });
     expect(reviewedReport.status).toBe(200);
-    expect((await (await request("/admin/reports?status=pending", { token })).json()).reports).toHaveLength(0);
+    expect((await (await request("/admin/reports?status=pending", { token })).json()).reports).toHaveLength(1);
     expect((await (await request("/admin/reports?status=reviewed", { token })).json()).reports[0]).toMatchObject({ id: reportId, review_note: "Conteúdo conferido" });
+    expect((await request(`/admin/reports/${removalReport.id}`, { method: "PATCH", token, body: { status: "reviewed", note: "Pedido de exclusão analisado" } })).status).toBe(200);
+    expect((await (await request("/admin/reports?status=pending", { token })).json()).reports).toHaveLength(0);
 
     const recipient = await env.DB.prepare("SELECT id FROM recipients WHERE slug = 'moderacao'").first();
     const seededLetters = Array.from({ length: 25 }, (_, index) => env.DB.prepare(`

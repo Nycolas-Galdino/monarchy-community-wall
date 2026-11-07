@@ -28,6 +28,9 @@ if (!index.includes('id="create-profile-button" type="button"')) throw new Error
 if (!index.includes('class="dialog-close" type="button" data-close-report')) {
   throw new Error("O fechamento da denúncia deve ser type=button para nunca enviar o formulário.");
 }
+if (!index.includes('<option value="removal">Solicitar exclusão do recado</option>') || !index.includes('title="Opções do recado"')) {
+  throw new Error("Os três pontos devem oferecer a solicitação de exclusão sem apagar automaticamente.");
+}
 if (index.includes("data-open-admin")) throw new Error("A navegação pública não pode expor a entrada da moderação.");
 if (!index.includes('id="profile-success-dialog"')) throw new Error("O artefato não contém a confirmação de perfil criado.");
 if (!index.includes('id="recipient-options"') || index.includes('<select id="recipient"')) {
